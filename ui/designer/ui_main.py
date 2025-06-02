@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'maineVjGrX.ui'
+## Form generated from reading UI file 'mainbDjgcS.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.0
 ##
@@ -24,7 +24,7 @@ class Ui_main_window(object):
     def setupUi(self, main_window):
         if not main_window.objectName():
             main_window.setObjectName(u"main_window")
-        main_window.resize(1195, 618)
+        main_window.resize(718, 483)
         self.centralwidget = QWidget(main_window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_2 = QGridLayout(self.centralwidget)
@@ -61,6 +61,9 @@ class Ui_main_window(object):
         self.gridLayout_4.addLayout(self.gridLayout_3, 0, 0, 1, 1)
 
         self.tblw_main.addTab(self.tab, "")
+        self.tab_2 = QWidget()
+        self.tab_2.setObjectName(u"tab_2")
+        self.tblw_main.addTab(self.tab_2, "")
 
         self.gridLayout.addWidget(self.tblw_main, 0, 0, 1, 1)
 
@@ -70,7 +73,7 @@ class Ui_main_window(object):
         main_window.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(main_window)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1195, 33))
+        self.menubar.setGeometry(QRect(0, 0, 718, 33))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuEdit = QMenu(self.menubar)
@@ -102,6 +105,7 @@ class Ui_main_window(object):
         self.btn_new_solution.setText(QCoreApplication.translate("main_window", u"New Solution", None))
         self.btn_open_solution.setText(QCoreApplication.translate("main_window", u"Open Solution", None))
         self.tblw_main.setTabText(self.tblw_main.indexOf(self.tab), QCoreApplication.translate("main_window", u"Home", None))
+        self.tblw_main.setTabText(self.tblw_main.indexOf(self.tab_2), QCoreApplication.translate("main_window", u"BaseTab", None))
         self.menuFile.setTitle(QCoreApplication.translate("main_window", u"File", None))
         self.menuEdit.setTitle(QCoreApplication.translate("main_window", u"Edit", None))
         self.menuView.setTitle(QCoreApplication.translate("main_window", u"View", None))
