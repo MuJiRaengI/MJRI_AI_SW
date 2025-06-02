@@ -2,3 +2,4 @@ pyside6
 pywin32
 opencv-python
 qt_material
+psutil
