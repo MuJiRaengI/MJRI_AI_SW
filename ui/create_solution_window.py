@@ -1,6 +1,8 @@
 import os
 import sys
+import shutil
 from datetime import datetime
+from pathlib import Path
 
 sys.path.append(os.path.abspath("."))
 
@@ -10,13 +12,62 @@ from PySide6.QtWidgets import QDialog
 from qt_material import apply_stylesheet
 
 from ui.designer.ui_create_solution import Ui_CreateSolutionWindow
+from source.solution.solution import Solution
 
 
 class CreateSolutionWindow(QDialog, Ui_CreateSolutionWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, solution: Solution = None):
         super().__init__(parent)
         self.setupUi(self)
-        self.ledit_solution_path.setText(os.getcwd())
+        self.ledit_solution_root.setText(os.getcwd())
+
+        self.solution = solution if solution else Solution()
+
+        self.btn_ok.clicked.connect(self.slot_btn_ok)
+        self.btn_cancel.clicked.connect(self.slot_btn_cancel)
+        self.btn_browse.clicked.connect(self.slot_btn_browse)
+
+    def slot_btn_browse(self):
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Select Solution Root Folder", os.getcwd()
+        )
+        if folder_path:
+            self.ledit_solution_root.setText(folder_path)
+
+    def slot_btn_ok(self):
+        solution_name = self.ledit_solution_name.text().strip()
+        solution_root = self.ledit_solution_root.text().strip()
+
+        # 경로 객체로 변환
+        solution_dir = os.path.join(solution_root, solution_name)
+        json_name = f"{solution_name}.json"
+
+        # 이미 폴더가 존재하면 처리
+        if os.path.exists(solution_dir):
+            if solution_name == "New_Solution":
+                shutil.rmtree(solution_dir)
+            else:
+                QMessageBox.warning(self, "Warning", "Solution already exists.")
+                return
+
+        # 폴더 생성
+        os.makedirs(solution_dir, exist_ok=True)
+        QMessageBox.information(
+            self,
+            "Success",
+            f"Solution '{solution_name}' created at {solution_root}.",
+        )
+
+        # Solution 객체 정보 저장
+        self.solution.root = Path(solution_root)
+        self.solution.name = Path(solution_name)
+        self.solution.json_name = Path(json_name)
+        self.solution.task = self.cbox_task.itemText(self.cbox_task.currentIndex())
+        self.solution.save_json()
+        self.accept()
+
+    def slot_btn_cancel(self):
+        self.reject()
 
 
 if __name__ == "__main__":
