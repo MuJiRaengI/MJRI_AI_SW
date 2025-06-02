@@ -32,7 +32,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         # signal-slot connections
         self.btn_close.clicked.connect(self.slot_btn_close)
         self.btn_show_screen.clicked.connect(self.slot_btn_show_screen)
-        self.btn_set_screen.clicked.connect(self.slot_btn_set_screen)
+        # self.btn_set_screen.clicked.connect(self.slot_btn_set_screen)
 
         self.update()
 
