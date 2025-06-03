@@ -12,6 +12,12 @@ class Solution:
         # task information
         self.task = None
 
+        self.target_window = None
+        self.screen_x = 0
+        self.screen_y = 0
+        self.screen_w = 0
+        self.screen_h = 0
+
     def to_dict(self):
         result = {}
         for k, v in self.__dict__.items():
@@ -24,12 +30,15 @@ class Solution:
     @classmethod
     def from_dict(cls, data):
         obj = cls()
-        # Path 객체로 변환
-        obj.root = Path(data.get("root", ""))
-        obj.name = Path(data.get("name", ""))
-        obj.json_name = Path(data.get("json_name", ""))
-        obj.task = data.get("task", None)
-        # 다른 멤버가 있다면 여기에 추가
+        for k, v in data.items():
+            # Path 타입 멤버 자동 변환 (필요시)
+            if hasattr(obj, k):
+                if isinstance(getattr(obj, k), Path):
+                    setattr(obj, k, Path(v))
+                else:
+                    setattr(obj, k, v)
+            else:
+                setattr(obj, k, v)
         return obj
 
     def save_json(self, file_path=None):

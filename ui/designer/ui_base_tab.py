@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'base_tabRTpvHd.ui'
+## Form generated from reading UI file 'base_tabjMpXru.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.0
 ##
@@ -18,13 +18,13 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGraphicsView,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel,
     QPushButton, QSizePolicy, QSpacerItem, QSpinBox,
-    QWidget)
+    QVBoxLayout, QWidget)
 
 class Ui_wdgt_base_tab(object):
     def setupUi(self, wdgt_base_tab):
         if not wdgt_base_tab.objectName():
             wdgt_base_tab.setObjectName(u"wdgt_base_tab")
-        wdgt_base_tab.resize(464, 482)
+        wdgt_base_tab.resize(641, 600)
         wdgt_base_tab.setMaximumSize(QSize(16384, 16384))
         self.gridLayout_2 = QGridLayout(wdgt_base_tab)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
@@ -78,16 +78,25 @@ class Ui_wdgt_base_tab(object):
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.gridLayout_3 = QGridLayout()
         self.gridLayout_3.setObjectName(u"gridLayout_3")
-        self.label_3 = QLabel(self.groupBox)
-        self.label_3.setObjectName(u"label_3")
+        self.label_6 = QLabel(self.groupBox)
+        self.label_6.setObjectName(u"label_6")
 
-        self.gridLayout_3.addWidget(self.label_3, 5, 0, 1, 1)
+        self.gridLayout_3.addWidget(self.label_6, 0, 0, 1, 2)
 
-        self.btn_show_screen = QPushButton(self.groupBox)
-        self.btn_show_screen.setObjectName(u"btn_show_screen")
-        self.btn_show_screen.setMaximumSize(QSize(200, 16777215))
+        self.cbox_target_window = QComboBox(self.groupBox)
+        self.cbox_target_window.setObjectName(u"cbox_target_window")
+        self.cbox_target_window.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self.gridLayout_3.addWidget(self.btn_show_screen, 7, 2, 1, 1)
+        self.gridLayout_3.addWidget(self.cbox_target_window, 1, 0, 1, 3)
+
+        self.label_4 = QLabel(self.groupBox)
+        self.label_4.setObjectName(u"label_4")
+
+        self.gridLayout_3.addWidget(self.label_4, 2, 0, 1, 3)
+
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout_3.addItem(self.verticalSpacer_2, 8, 2, 1, 1)
 
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
@@ -135,6 +144,11 @@ class Ui_wdgt_base_tab(object):
 
         self.gridLayout_3.addLayout(self.horizontalLayout_2, 4, 0, 1, 3)
 
+        self.label_3 = QLabel(self.groupBox)
+        self.label_3.setObjectName(u"label_3")
+
+        self.gridLayout_3.addWidget(self.label_3, 5, 0, 1, 1)
+
         self.graphicsView = QGraphicsView(self.groupBox)
         self.graphicsView.setObjectName(u"graphicsView")
         sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -142,38 +156,9 @@ class Ui_wdgt_base_tab(object):
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.graphicsView.sizePolicy().hasHeightForWidth())
         self.graphicsView.setSizePolicy(sizePolicy2)
+        self.graphicsView.setMinimumSize(QSize(300, 300))
 
-        self.gridLayout_3.addWidget(self.graphicsView, 6, 0, 4, 2)
-
-        self.label_4 = QLabel(self.groupBox)
-        self.label_4.setObjectName(u"label_4")
-
-        self.gridLayout_3.addWidget(self.label_4, 2, 0, 1, 3)
-
-        self.btn_set_screen = QPushButton(self.groupBox)
-        self.btn_set_screen.setObjectName(u"btn_set_screen")
-        self.btn_set_screen.setMaximumSize(QSize(200, 16777215))
-
-        self.gridLayout_3.addWidget(self.btn_set_screen, 8, 2, 1, 1)
-
-        self.label_6 = QLabel(self.groupBox)
-        self.label_6.setObjectName(u"label_6")
-
-        self.gridLayout_3.addWidget(self.label_6, 0, 0, 1, 2)
-
-        self.cbox_target_window = QComboBox(self.groupBox)
-        self.cbox_target_window.setObjectName(u"cbox_target_window")
-
-        self.gridLayout_3.addWidget(self.cbox_target_window, 1, 0, 1, 3)
-
-        self.ckbx_real_time_view = QCheckBox(self.groupBox)
-        self.ckbx_real_time_view.setObjectName(u"ckbx_real_time_view")
-
-        self.gridLayout_3.addWidget(self.ckbx_real_time_view, 6, 2, 1, 1)
-
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.gridLayout_3.addItem(self.verticalSpacer_2, 9, 2, 1, 1)
+        self.gridLayout_3.addWidget(self.graphicsView, 6, 0, 3, 2)
 
         self.horizontalLayout_5 = QHBoxLayout()
         self.horizontalLayout_5.setObjectName(u"horizontalLayout_5")
@@ -189,6 +174,7 @@ class Ui_wdgt_base_tab(object):
         self.spbx_screen_x = QSpinBox(self.groupBox)
         self.spbx_screen_x.setObjectName(u"spbx_screen_x")
         self.spbx_screen_x.setMinimumSize(QSize(100, 0))
+        self.spbx_screen_x.setFocusPolicy(Qt.FocusPolicy.WheelFocus)
         self.spbx_screen_x.setMaximum(16384)
         self.spbx_screen_x.setValue(0)
 
@@ -206,6 +192,7 @@ class Ui_wdgt_base_tab(object):
         self.spbx_screen_y = QSpinBox(self.groupBox)
         self.spbx_screen_y.setObjectName(u"spbx_screen_y")
         self.spbx_screen_y.setMinimumSize(QSize(100, 0))
+        self.spbx_screen_y.setFocusPolicy(Qt.FocusPolicy.WheelFocus)
         self.spbx_screen_y.setMaximum(16384)
         self.spbx_screen_y.setValue(0)
 
@@ -218,22 +205,41 @@ class Ui_wdgt_base_tab(object):
 
         self.gridLayout_3.addLayout(self.horizontalLayout_5, 3, 0, 1, 3)
 
+        self.ckbx_real_time_view = QCheckBox(self.groupBox)
+        self.ckbx_real_time_view.setObjectName(u"ckbx_real_time_view")
+
+        self.gridLayout_3.addWidget(self.ckbx_real_time_view, 6, 2, 1, 1)
+
+        self.btn_show_screen = QPushButton(self.groupBox)
+        self.btn_show_screen.setObjectName(u"btn_show_screen")
+        self.btn_show_screen.setMaximumSize(QSize(200, 16777215))
+        self.btn_show_screen.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self.gridLayout_3.addWidget(self.btn_show_screen, 7, 2, 1, 1)
+
 
         self.gridLayout_4.addLayout(self.gridLayout_3, 1, 1, 1, 1)
 
 
         self.gridLayout.addWidget(self.groupBox, 2, 0, 1, 5)
 
-        self.horizontalLayout_4 = QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.verticalLayout = QVBoxLayout()
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.btn_save = QPushButton(wdgt_base_tab)
+        self.btn_save.setObjectName(u"btn_save")
+        self.btn_save.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self.verticalLayout.addWidget(self.btn_save)
+
         self.btn_close = QPushButton(wdgt_base_tab)
         self.btn_close.setObjectName(u"btn_close")
         self.btn_close.setMaximumSize(QSize(200, 16777215))
+        self.btn_close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self.horizontalLayout_4.addWidget(self.btn_close)
+        self.verticalLayout.addWidget(self.btn_close)
 
 
-        self.gridLayout.addLayout(self.horizontalLayout_4, 1, 4, 1, 1)
+        self.gridLayout.addLayout(self.verticalLayout, 1, 4, 1, 1)
 
 
         self.gridLayout_2.addLayout(self.gridLayout, 0, 0, 1, 1)
@@ -252,16 +258,16 @@ class Ui_wdgt_base_tab(object):
         self.lbl_solution_name.setText(QCoreApplication.translate("wdgt_base_tab", u"None", None))
         self.lbl_solution_root.setText(QCoreApplication.translate("wdgt_base_tab", u"None", None))
         self.groupBox.setTitle(QCoreApplication.translate("wdgt_base_tab", u"Screen Menu", None))
-        self.label_3.setText(QCoreApplication.translate("wdgt_base_tab", u"Preview", None))
-        self.btn_show_screen.setText(QCoreApplication.translate("wdgt_base_tab", u"Show Screen", None))
+        self.label_6.setText(QCoreApplication.translate("wdgt_base_tab", u"Target Window", None))
+        self.label_4.setText(QCoreApplication.translate("wdgt_base_tab", u"Screen Size", None))
         self.label_5.setText(QCoreApplication.translate("wdgt_base_tab", u"W :", None))
         self.label_7.setText(QCoreApplication.translate("wdgt_base_tab", u"H :", None))
-        self.label_4.setText(QCoreApplication.translate("wdgt_base_tab", u"Screen Size", None))
-        self.btn_set_screen.setText(QCoreApplication.translate("wdgt_base_tab", u"Set Screen", None))
-        self.label_6.setText(QCoreApplication.translate("wdgt_base_tab", u"Target Window", None))
-        self.ckbx_real_time_view.setText(QCoreApplication.translate("wdgt_base_tab", u"Real-time View", None))
+        self.label_3.setText(QCoreApplication.translate("wdgt_base_tab", u"Preview", None))
         self.label_12.setText(QCoreApplication.translate("wdgt_base_tab", u"X :", None))
         self.label_11.setText(QCoreApplication.translate("wdgt_base_tab", u"Y : ", None))
+        self.ckbx_real_time_view.setText(QCoreApplication.translate("wdgt_base_tab", u"Real-time View", None))
+        self.btn_show_screen.setText(QCoreApplication.translate("wdgt_base_tab", u"Show Screen", None))
+        self.btn_save.setText(QCoreApplication.translate("wdgt_base_tab", u"Save", None))
         self.btn_close.setText(QCoreApplication.translate("wdgt_base_tab", u"Close", None))
     # retranslateUi
 
