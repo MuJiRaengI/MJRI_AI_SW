@@ -220,13 +220,9 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self.spbx_screen_h.setValue(geom.height())
 
     def clamp_spinbox_to_target_window(self):
-        """
-        target window가 miss가 아닌 경우, spinbox의 x, y 값이 target window의 범위를 벗어나지 않도록 제한
-        단, w, h는 유지하고 x, y만 clamp
-        """
         target_text = self.cbox_target_window.currentText()
         if not target_text or target_text.startswith("(miss) "):
-            return  # miss면 제한하지 않음
+            return
         hwnd = None
 
         def enum_hwnds():
@@ -268,7 +264,6 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 self.spbx_screen_y.setValue(clamped_y)
 
     def _clamp_spinbox_to_target_window(self):
-        # Only clamp if target is not miss
         target_text = self.cbox_target_window.currentText()
         if not target_text or target_text.startswith("(miss) "):
             return
