@@ -3,3 +3,15 @@ pywin32
 opencv-python
 qt_material
 psutil
+transformers
+einops
+timm
+av
+decord
+accelerate
+bitsandbytes
+sounddevice
+soundfile
+gym[atari]
+pygame
+stable-baselines3[extra]

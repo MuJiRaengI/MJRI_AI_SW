@@ -1,4 +1,10 @@
 New_Solution*/
+*.png
+*.jpg
+*.jpeg
+*.wav
+test.py
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
