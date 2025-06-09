@@ -15,8 +15,10 @@ class Solution:
         self.target_window = None
         self.screen_x = 0
         self.screen_y = 0
-        self.screen_w = 0
-        self.screen_h = 0
+        self.screen_w = 100
+        self.screen_h = 100
+
+        self.game = None
 
     def to_dict(self):
         result = {}
