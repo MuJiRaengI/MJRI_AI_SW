@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'base_tabjMpXru.ui'
+## Form generated from reading UI file 'base_tabZzhmOd.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.9.0
+## Created by: Qt User Interface Compiler version 6.9.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -24,7 +24,7 @@ class Ui_wdgt_base_tab(object):
     def setupUi(self, wdgt_base_tab):
         if not wdgt_base_tab.objectName():
             wdgt_base_tab.setObjectName(u"wdgt_base_tab")
-        wdgt_base_tab.resize(641, 600)
+        wdgt_base_tab.resize(641, 795)
         wdgt_base_tab.setMaximumSize(QSize(16384, 16384))
         self.gridLayout_2 = QGridLayout(wdgt_base_tab)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
@@ -84,6 +84,7 @@ class Ui_wdgt_base_tab(object):
         self.gridLayout_3.addWidget(self.label_6, 0, 0, 1, 2)
 
         self.cbox_target_window = QComboBox(self.groupBox)
+        self.cbox_target_window.addItem("")
         self.cbox_target_window.setObjectName(u"cbox_target_window")
         self.cbox_target_window.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
@@ -244,6 +245,67 @@ class Ui_wdgt_base_tab(object):
 
         self.gridLayout_2.addLayout(self.gridLayout, 0, 0, 1, 1)
 
+        self.groupBox_3 = QGroupBox(wdgt_base_tab)
+        self.groupBox_3.setObjectName(u"groupBox_3")
+        self.gridLayout_8 = QGridLayout(self.groupBox_3)
+        self.gridLayout_8.setObjectName(u"gridLayout_8")
+        self.gridLayout_7 = QGridLayout()
+        self.gridLayout_7.setObjectName(u"gridLayout_7")
+        self.btn_select_game = QPushButton(self.groupBox_3)
+        self.btn_select_game.setObjectName(u"btn_select_game")
+
+        self.gridLayout_7.addWidget(self.btn_select_game, 1, 1, 1, 1)
+
+        self.label_8 = QLabel(self.groupBox_3)
+        self.label_8.setObjectName(u"label_8")
+
+        self.gridLayout_7.addWidget(self.label_8, 0, 0, 1, 1)
+
+        self.cbox_select_game = QComboBox(self.groupBox_3)
+        self.cbox_select_game.setObjectName(u"cbox_select_game")
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sizePolicy3.setHorizontalStretch(0)
+        sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.cbox_select_game.sizePolicy().hasHeightForWidth())
+        self.cbox_select_game.setSizePolicy(sizePolicy3)
+
+        self.gridLayout_7.addWidget(self.cbox_select_game, 1, 0, 1, 1)
+
+        self.horizontalLayout = QHBoxLayout()
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.btn_self_play = QPushButton(self.groupBox_3)
+        self.btn_self_play.setObjectName(u"btn_self_play")
+        self.btn_self_play.setEnabled(False)
+
+        self.horizontalLayout.addWidget(self.btn_self_play)
+
+        self.btn_random_play = QPushButton(self.groupBox_3)
+        self.btn_random_play.setObjectName(u"btn_random_play")
+        self.btn_random_play.setEnabled(False)
+
+        self.horizontalLayout.addWidget(self.btn_random_play)
+
+        self.btn_train = QPushButton(self.groupBox_3)
+        self.btn_train.setObjectName(u"btn_train")
+        self.btn_train.setEnabled(False)
+
+        self.horizontalLayout.addWidget(self.btn_train)
+
+        self.btn_test = QPushButton(self.groupBox_3)
+        self.btn_test.setObjectName(u"btn_test")
+        self.btn_test.setEnabled(False)
+
+        self.horizontalLayout.addWidget(self.btn_test)
+
+
+        self.gridLayout_7.addLayout(self.horizontalLayout, 2, 0, 1, 2)
+
+
+        self.gridLayout_8.addLayout(self.gridLayout_7, 0, 0, 1, 1)
+
+
+        self.gridLayout_2.addWidget(self.groupBox_3, 1, 0, 1, 1)
+
 
         self.retranslateUi(wdgt_base_tab)
 
@@ -259,6 +321,8 @@ class Ui_wdgt_base_tab(object):
         self.lbl_solution_root.setText(QCoreApplication.translate("wdgt_base_tab", u"None", None))
         self.groupBox.setTitle(QCoreApplication.translate("wdgt_base_tab", u"Screen Menu", None))
         self.label_6.setText(QCoreApplication.translate("wdgt_base_tab", u"Target Window", None))
+        self.cbox_target_window.setItemText(0, QCoreApplication.translate("wdgt_base_tab", u"None", None))
+
         self.label_4.setText(QCoreApplication.translate("wdgt_base_tab", u"Screen Size", None))
         self.label_5.setText(QCoreApplication.translate("wdgt_base_tab", u"W :", None))
         self.label_7.setText(QCoreApplication.translate("wdgt_base_tab", u"H :", None))
@@ -269,5 +333,12 @@ class Ui_wdgt_base_tab(object):
         self.btn_show_screen.setText(QCoreApplication.translate("wdgt_base_tab", u"Show Screen", None))
         self.btn_save.setText(QCoreApplication.translate("wdgt_base_tab", u"Save", None))
         self.btn_close.setText(QCoreApplication.translate("wdgt_base_tab", u"Close", None))
+        self.groupBox_3.setTitle(QCoreApplication.translate("wdgt_base_tab", u"Game", None))
+        self.btn_select_game.setText(QCoreApplication.translate("wdgt_base_tab", u"Select", None))
+        self.label_8.setText(QCoreApplication.translate("wdgt_base_tab", u"Game List", None))
+        self.btn_self_play.setText(QCoreApplication.translate("wdgt_base_tab", u"Self Play", None))
+        self.btn_random_play.setText(QCoreApplication.translate("wdgt_base_tab", u"Random Play", None))
+        self.btn_train.setText(QCoreApplication.translate("wdgt_base_tab", u"Train", None))
+        self.btn_test.setText(QCoreApplication.translate("wdgt_base_tab", u"Test", None))
     # retranslateUi
 

@@ -10,6 +10,9 @@ import win32gui
 import win32process
 import psutil
 import win32con
+import importlib
+import inspect
+import os
 from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QDialog
@@ -41,6 +44,13 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             idx = self.cbox_target_window.findText(self.solution.target_window)
             if idx != -1:
                 self.cbox_target_window.setCurrentIndex(idx)
+
+        self.update_select_game_list()
+        if self.solution.game:
+            idx = self.cbox_select_game.findText(self.solution.game)
+            if idx != -1:
+                self.cbox_select_game.setCurrentIndex(idx)
+
         self.btn_close.clicked.connect(self.slot_btn_close)
         self.btn_show_screen.clicked.connect(self.slot_btn_show_screen)
         self.ckbx_real_time_view.stateChanged.connect(self.slot_ckbx_real_time_view)
@@ -51,8 +61,33 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self._window_list_timer = QTimer(self)
         self._window_list_timer.timeout.connect(self.update_target_window_list)
         self._window_list_timer.start(100)
-        self._connect_spinbox_clamp()  # spinbox clamp 연결
+        self._connect_spinbox_clamp()
         self.update()
+
+    def update_select_game_list(self):
+        """
+        source/envs/__init__.py에서 from ... import ... 또는 __all__에 명시된 클래스만 cbox_select_game에 추가합니다.
+        """
+
+        # source.envs를 import하여, __all__ 또는 globals()에서 클래스만 추출
+        try:
+            envs_module = importlib.import_module("source.envs")
+        except Exception:
+            self.cbox_select_game.clear()
+            return
+        class_names = []
+        # __all__이 있으면 그 안의 이름만, 없으면 globals()에서 직접 추출
+        names = getattr(envs_module, "__all__", None)
+        if names is None:
+            names = [
+                name for name, obj in vars(envs_module).items() if inspect.isclass(obj)
+            ]
+        for name in names:
+            obj = getattr(envs_module, name, None)
+            if inspect.isclass(obj):
+                class_names.append(name)
+        self.cbox_select_game.clear()
+        self.cbox_select_game.addItems(class_names)
 
     def update_target_window_list(self):
         current_text = self.cbox_target_window.currentText()
@@ -76,6 +111,8 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             return windows
 
         items = enum_windows()
+        # None 선택 가능하도록 맨 앞에 추가
+        items.insert(0, "None")
         missing_target = bool(solution_target and solution_target not in items)
         if missing_target:
             items.append(f"(miss) {solution_target}")
@@ -91,6 +128,9 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 idx = self.cbox_target_window.findText(f"(miss) {solution_target}")
                 if idx != -1:
                     self.cbox_target_window.setCurrentIndex(idx)
+            else:
+                # 아무것도 선택 안 했으면 None 선택
+                self.cbox_target_window.setCurrentIndex(0)
             self.cbox_target_window.blockSignals(False)
             self._last_window_list = items
 
@@ -154,7 +194,24 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         else:
             super().keyPressEvent(event)
 
+    def update_solution_from_ui(self):
+        """
+        현재 UI의 값들로 self.solution 객체를 업데이트합니다.
+        """
+        self.solution.screen_x = self.spbx_screen_x.value()
+        self.solution.screen_y = self.spbx_screen_y.value()
+        self.solution.screen_w = self.spbx_screen_w.value()
+        self.solution.screen_h = self.spbx_screen_h.value()
+        target_text = self.cbox_target_window.currentText()
+        if target_text == "None" or target_text.startswith("(miss) "):
+            self.solution.target_window = None
+        else:
+            self.solution.target_window = target_text
+
+        self.solution.game = self.cbox_select_game.currentText()
+
     def slot_btn_save(self):
+        self.update_solution_from_ui()  # UI 값으로 solution 업데이트
         try:
             self.solution.save_json()
             QMessageBox.information(

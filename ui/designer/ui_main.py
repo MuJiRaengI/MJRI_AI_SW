@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainSCNDWU.ui'
+## Form generated from reading UI file 'mainvYQHzN.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.9.0
+## Created by: Qt User Interface Compiler version 6.9.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -25,6 +25,8 @@ class Ui_main_window(object):
         if not main_window.objectName():
             main_window.setObjectName(u"main_window")
         main_window.resize(718, 483)
+        self.actionStart = QAction(main_window)
+        self.actionStart.setObjectName(u"actionStart")
         self.centralwidget = QWidget(main_window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_2 = QGridLayout(self.centralwidget)
@@ -88,6 +90,7 @@ class Ui_main_window(object):
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuView.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
+        self.menuHelp.addAction(self.actionStart)
 
         self.retranslateUi(main_window)
 
@@ -99,12 +102,13 @@ class Ui_main_window(object):
 
     def retranslateUi(self, main_window):
         main_window.setWindowTitle(QCoreApplication.translate("main_window", u"MJRI AI Software", None))
+        self.actionStart.setText(QCoreApplication.translate("main_window", u"Start", None))
         self.btn_new_solution.setText(QCoreApplication.translate("main_window", u"New Solution", None))
         self.btn_open_solution.setText(QCoreApplication.translate("main_window", u"Open Solution", None))
         self.tblw_main.setTabText(self.tblw_main.indexOf(self.tab), QCoreApplication.translate("main_window", u"Home", None))
         self.menuFile.setTitle(QCoreApplication.translate("main_window", u"File", None))
         self.menuEdit.setTitle(QCoreApplication.translate("main_window", u"Edit", None))
         self.menuView.setTitle(QCoreApplication.translate("main_window", u"View", None))
-        self.menuHelp.setTitle(QCoreApplication.translate("main_window", u"Help", None))
+        self.menuHelp.setTitle(QCoreApplication.translate("main_window", u"LLM", None))
     # retranslateUi
 
