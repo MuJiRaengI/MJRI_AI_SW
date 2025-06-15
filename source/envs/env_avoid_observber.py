@@ -12,13 +12,23 @@ import os
 
 class EnvAvoidObserver(gym.Env):
     def __init__(
-        self, map_size_px=(4096, 4096), tile_size=64, max_steps=1000, num_observers=0
+        self,
+        map_size_px=(4096, 4096),
+        tile_size=64,
+        max_steps=1000,
+        num_observers=0,
+        h=640,
+        w=1280,
+        scale_factor=0.5,
     ):
         super().__init__()
         self.map_size_px = np.array(map_size_px)
         self.tile_size = tile_size
         self.max_steps = max_steps
         self.num_observers = num_observers
+        self.scale_factor = scale_factor
+        self.h = int(h * self.scale_factor)
+        self.w = int(w * self.scale_factor)
 
         self.camera_size_tiles = (20, 10)
         self.camera_size_px = (
@@ -32,8 +42,16 @@ class EnvAvoidObserver(gym.Env):
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
 
         obs_dim = 2 + 2 * num_observers
-        self.observation_space = spaces.Box(
-            low=0, high=max(self.map_size_px), shape=(obs_dim,), dtype=np.float32
+        # observation_space를 Dict로 정의
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(
+                    low=0, high=255, shape=(9, self.h, self.w), dtype=np.uint8
+                ),
+                "vector": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
+                ),
+            }
         )
         self.action_space = spaces.Discrete(8)
 
@@ -164,7 +182,13 @@ class EnvAvoidObserver(gym.Env):
             self.reward = self.calc_reward(action, pos=new_pos)
             self.total_reward += self.reward
             self.steps += 1
-            return self._get_obs(), self.reward, True, {}
+            image_obs = self._get_image_obs()  # (9, h, w) numpy array 반환
+            vector_obs = self._get_vector_obs()  # (4,) numpy array 반환
+            obs = {
+                "image": np.array(image_obs, dtype=np.uint8),
+                "vector": np.array(vector_obs, dtype=np.float32),
+            }
+            return obs, self.reward, True, {}
 
         # 위치 갱신
         self.agent_pos = new_pos
@@ -201,7 +225,6 @@ class EnvAvoidObserver(gym.Env):
         self.steps += 1
 
         state = self.get_state_tensor()
-        ss = state.squeeze(0) * 255
         self.state_buffer.append(state)
 
         return self._get_obs(), self.reward, done, {}
@@ -292,7 +315,8 @@ class EnvAvoidObserver(gym.Env):
     def get_stacked_state(self):
         return F.interpolate(
             torch.concat(list(self.state_buffer), dim=0).unsqueeze(0),
-            scale_factor=(0.5, 0.5),
+            scale_factor=(self.scale_factor, self.scale_factor),
+            mode="nearest",
         ).squeeze()
 
     def _is_obstacle(self, pos) -> bool:
@@ -311,6 +335,14 @@ class EnvAvoidObserver(gym.Env):
         )
 
     def _get_obs(self):
+        # obs 생성
+        image_obs = self._get_image_obs()
+        vector_obs = self._get_vector_obs()
+        obs = {
+            "image": np.array(image_obs, dtype=np.uint8),
+            "vector": np.array(vector_obs, dtype=np.float32),
+        }
+        return obs
         obs = [*self.agent_pos]
         obs += self.get_direction_one_hot(self.agent_pos)
         for o in self.observers:
@@ -352,9 +384,11 @@ class EnvAvoidObserver(gym.Env):
         observer_mask = observer_mask[np.newaxis, :, :]
         agent_mask = agent_mask[np.newaxis, :, :]
 
-        return torch.from_numpy(
+        scene = torch.from_numpy(
             np.concatenate([obs_mask, observer_mask, agent_mask], axis=0)
         )
+
+        return scene * 255
 
     def get_direction_one_hot(self, pos=None):
         """
@@ -444,9 +478,16 @@ class EnvAvoidObserver(gym.Env):
         self.video_writer = None
         pygame.quit()
 
+    def _get_image_obs(self):
+        state = self.get_stacked_state()
+        return np.array(state)
+
+    def _get_vector_obs(self):
+        return np.array(self.get_direction_one_hot(self.agent_pos))
+
 
 if __name__ == "__main__":
-    env = AvoidObserverEnv()
+    env = EnvAvoidObserver()
     env.start_recording("test_run.mp4")
 
     obs = env.reset()
