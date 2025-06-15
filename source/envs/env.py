@@ -3,14 +3,21 @@ import abc
 
 class Env(abc.ABC):
     def __init__(self):
+        self.fps = 30
         self.mode = None
+        self.save_dir = None
+        self.log_dir = "logs"
+
+    @abc.abstractmethod
+    def reset(self):
+        pass
 
     @abc.abstractmethod
     def _self_play(self):
         pass
 
     @abc.abstractmethod
-    def _random_paly(self):
+    def _random_play(self):
         pass
 
     @abc.abstractmethod
@@ -21,12 +28,13 @@ class Env(abc.ABC):
     def _test(self):
         pass
 
-    def play(self, mode="random"):
+    def play(self, save_dir, mode="random"):
+        self.save_dir = save_dir
         self.mode = mode
         if mode == "self_play":
             return self._self_play()
         elif mode == "random_play":
-            return self._random_paly()
+            return self._random_play()
         elif mode == "train":
             return self._train()
         elif mode == "test":

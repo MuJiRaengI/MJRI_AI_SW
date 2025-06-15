@@ -29,6 +29,7 @@ from source.solution.solution import Solution
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
     def __init__(self, parent=None, solution: Solution = None):
         super().__init__(parent)
+        self._env_running = False
         self.setupUi(self)
         self.solution = solution
         self._screen = Screen()
@@ -62,6 +63,14 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self._window_list_timer.timeout.connect(self.update_target_window_list)
         self._window_list_timer.start(100)
         self._connect_spinbox_clamp()
+        self.btn_self_play.clicked.connect(lambda: self.slot_btn_env_play("self_play"))
+        self.btn_random_play.clicked.connect(
+            lambda: self.slot_btn_env_play("random_play")
+        )
+        self.btn_train.clicked.connect(lambda: self.slot_btn_env_play("train"))
+        self.btn_test.clicked.connect(lambda: self.slot_btn_env_play("test"))
+        self.cbox_target_window.wheelEvent = lambda event: None
+        self.cbox_select_game.wheelEvent = lambda event: None
         self.update()
 
     def update_select_game_list(self):
@@ -133,6 +142,42 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 self.cbox_target_window.setCurrentIndex(0)
             self.cbox_target_window.blockSignals(False)
             self._last_window_list = items
+
+    def _get_env(self, env_text):
+        """
+        주어진 env_text에 해당하는 환경 클래스를 가져옵니다.
+        """
+        try:
+            module = importlib.import_module(f"source.envs.{env_text.lower()}")
+            env_class = getattr(module, env_text, None)
+            if env_class is None:
+                raise ImportError(f"{env_text} 클래스가 {module.__name__}에 없습니다.")
+            return env_class
+        except ImportError as e:
+            QMessageBox.critical(
+                self, "오류", f"게임을 불러오는 중 오류가 발생했습니다: {e}"
+            )
+            return None
+
+    def slot_btn_env_play(self, mode):
+        # 환경 실행 중인지 인스턴스 변수로 관리
+        if self._env_running:
+            QMessageBox.warning(
+                self,
+                "실행 중",
+                "이 솔루션에서 가상 환경이 이미 실행 중입니다. 먼저 기존 환경을 종료하세요.",
+            )
+            return
+        self._env_running = True
+        try:
+            env = self._get_env(self.cbox_select_game.currentText())
+            if env is None:
+                self._env_running = False
+                return
+            env = env()
+            env.play(str(self.solution.root / self.solution.name), mode)
+        finally:
+            self._env_running = False
 
     def slot_btn_close(self):
         reply = QMessageBox.question(
@@ -351,10 +396,18 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             left, top, right, bottom = win32gui.GetClientRect(hwnd)
             client_w = right - left
             client_h = bottom - top
+            # w, h가 target window의 크기를 넘지 않게 clamp
             w = self.spbx_screen_w.value()
             h = self.spbx_screen_h.value()
-            max_x = max(0, client_w - w)
-            max_y = max(0, client_h - h)
+            clamped_w = min(w, client_w)
+            clamped_h = min(h, client_h)
+            if clamped_w != w:
+                self.spbx_screen_w.setValue(clamped_w)
+            if clamped_h != h:
+                self.spbx_screen_h.setValue(clamped_h)
+            # x, y도 기존대로 clamp
+            max_x = max(0, client_w - self.spbx_screen_w.value())
+            max_y = max(0, client_h - self.spbx_screen_h.value())
             x = self.spbx_screen_x.value()
             y = self.spbx_screen_y.value()
             clamped_x = min(max(0, x), max_x)

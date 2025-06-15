@@ -81,8 +81,8 @@ if __name__ == "__main__":
     mjri_bot = MJRIBot()
     mjri_bot.load_model()
     # image_path = "테스트.png"
-    nickname = "가나다라"
-    text = "너는 뭐로 만들어졌어?"
+    nickname = "무지랭이"
+    text = "오늘 나의 생방송이 끝이 났어. 시청자분들께 감사의 한말씀 부탁해"
     answer = mjri_bot.chat(nickname, text)
     print(f"Answer: {answer}")
     mjri_bot.speech(answer)

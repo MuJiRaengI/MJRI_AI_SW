@@ -106,7 +106,7 @@
           <item row="1" column="0" colspan="3">
            <widget class="QComboBox" name="cbox_target_window">
             <property name="focusPolicy">
-             <enum>Qt::FocusPolicy::NoFocus</enum>
+             <enum>Qt::FocusPolicy::StrongFocus</enum>
             </property>
             <item>
              <property name="text">
@@ -418,20 +418,6 @@
      <layout class="QGridLayout" name="gridLayout_8">
       <item row="0" column="0">
        <layout class="QGridLayout" name="gridLayout_7">
-        <item row="1" column="1">
-         <widget class="QPushButton" name="btn_select_game">
-          <property name="text">
-           <string>Select</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_8">
-          <property name="text">
-           <string>Game List</string>
-          </property>
-         </widget>
-        </item>
         <item row="1" column="0">
          <widget class="QComboBox" name="cbox_select_game">
           <property name="sizePolicy">
@@ -440,14 +426,17 @@
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
+          <property name="focusPolicy">
+           <enum>Qt::FocusPolicy::StrongFocus</enum>
+          </property>
          </widget>
         </item>
-        <item row="2" column="0" colspan="2">
+        <item row="2" column="0">
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
            <widget class="QPushButton" name="btn_self_play">
             <property name="enabled">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="text">
              <string>Self Play</string>
@@ -457,7 +446,7 @@
           <item>
            <widget class="QPushButton" name="btn_random_play">
             <property name="enabled">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="text">
              <string>Random Play</string>
@@ -467,7 +456,7 @@
           <item>
            <widget class="QPushButton" name="btn_train">
             <property name="enabled">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="text">
              <string>Train</string>
@@ -477,7 +466,7 @@
           <item>
            <widget class="QPushButton" name="btn_test">
             <property name="enabled">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="text">
              <string>Test</string>
@@ -485,6 +474,13 @@
            </widget>
           </item>
          </layout>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_8">
+          <property name="text">
+           <string>Game List</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>

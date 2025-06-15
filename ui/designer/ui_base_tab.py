@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'base_tabZzhmOd.ui'
+## Form generated from reading UI file 'base_tabarsAYf.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -86,7 +86,7 @@ class Ui_wdgt_base_tab(object):
         self.cbox_target_window = QComboBox(self.groupBox)
         self.cbox_target_window.addItem("")
         self.cbox_target_window.setObjectName(u"cbox_target_window")
-        self.cbox_target_window.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.cbox_target_window.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.gridLayout_3.addWidget(self.cbox_target_window, 1, 0, 1, 3)
 
@@ -251,16 +251,6 @@ class Ui_wdgt_base_tab(object):
         self.gridLayout_8.setObjectName(u"gridLayout_8")
         self.gridLayout_7 = QGridLayout()
         self.gridLayout_7.setObjectName(u"gridLayout_7")
-        self.btn_select_game = QPushButton(self.groupBox_3)
-        self.btn_select_game.setObjectName(u"btn_select_game")
-
-        self.gridLayout_7.addWidget(self.btn_select_game, 1, 1, 1, 1)
-
-        self.label_8 = QLabel(self.groupBox_3)
-        self.label_8.setObjectName(u"label_8")
-
-        self.gridLayout_7.addWidget(self.label_8, 0, 0, 1, 1)
-
         self.cbox_select_game = QComboBox(self.groupBox_3)
         self.cbox_select_game.setObjectName(u"cbox_select_game")
         sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -268,6 +258,7 @@ class Ui_wdgt_base_tab(object):
         sizePolicy3.setVerticalStretch(0)
         sizePolicy3.setHeightForWidth(self.cbox_select_game.sizePolicy().hasHeightForWidth())
         self.cbox_select_game.setSizePolicy(sizePolicy3)
+        self.cbox_select_game.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.gridLayout_7.addWidget(self.cbox_select_game, 1, 0, 1, 1)
 
@@ -275,30 +266,35 @@ class Ui_wdgt_base_tab(object):
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.btn_self_play = QPushButton(self.groupBox_3)
         self.btn_self_play.setObjectName(u"btn_self_play")
-        self.btn_self_play.setEnabled(False)
+        self.btn_self_play.setEnabled(True)
 
         self.horizontalLayout.addWidget(self.btn_self_play)
 
         self.btn_random_play = QPushButton(self.groupBox_3)
         self.btn_random_play.setObjectName(u"btn_random_play")
-        self.btn_random_play.setEnabled(False)
+        self.btn_random_play.setEnabled(True)
 
         self.horizontalLayout.addWidget(self.btn_random_play)
 
         self.btn_train = QPushButton(self.groupBox_3)
         self.btn_train.setObjectName(u"btn_train")
-        self.btn_train.setEnabled(False)
+        self.btn_train.setEnabled(True)
 
         self.horizontalLayout.addWidget(self.btn_train)
 
         self.btn_test = QPushButton(self.groupBox_3)
         self.btn_test.setObjectName(u"btn_test")
-        self.btn_test.setEnabled(False)
+        self.btn_test.setEnabled(True)
 
         self.horizontalLayout.addWidget(self.btn_test)
 
 
-        self.gridLayout_7.addLayout(self.horizontalLayout, 2, 0, 1, 2)
+        self.gridLayout_7.addLayout(self.horizontalLayout, 2, 0, 1, 1)
+
+        self.label_8 = QLabel(self.groupBox_3)
+        self.label_8.setObjectName(u"label_8")
+
+        self.gridLayout_7.addWidget(self.label_8, 0, 0, 1, 1)
 
 
         self.gridLayout_8.addLayout(self.gridLayout_7, 0, 0, 1, 1)
@@ -334,11 +330,10 @@ class Ui_wdgt_base_tab(object):
         self.btn_save.setText(QCoreApplication.translate("wdgt_base_tab", u"Save", None))
         self.btn_close.setText(QCoreApplication.translate("wdgt_base_tab", u"Close", None))
         self.groupBox_3.setTitle(QCoreApplication.translate("wdgt_base_tab", u"Game", None))
-        self.btn_select_game.setText(QCoreApplication.translate("wdgt_base_tab", u"Select", None))
-        self.label_8.setText(QCoreApplication.translate("wdgt_base_tab", u"Game List", None))
         self.btn_self_play.setText(QCoreApplication.translate("wdgt_base_tab", u"Self Play", None))
         self.btn_random_play.setText(QCoreApplication.translate("wdgt_base_tab", u"Random Play", None))
         self.btn_train.setText(QCoreApplication.translate("wdgt_base_tab", u"Train", None))
         self.btn_test.setText(QCoreApplication.translate("wdgt_base_tab", u"Test", None))
+        self.label_8.setText(QCoreApplication.translate("wdgt_base_tab", u"Game List", None))
     # retranslateUi
 
