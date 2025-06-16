@@ -34,15 +34,17 @@ class Breakout(Env):
         self.obs, self.info = self.env.reset()
         self.done = False
 
+    def key_info(self) -> str:
+        return (
+            "[조작법] A: 왼쪽, D: 오른쪽, SPACE: 발사, ESC: 종료\n"
+            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
+        )
+
     def _self_play(self):
         self.reset()
         running = True
         action = 0
-        QtWidgets.QMessageBox.information(
-            None,
-            "Breakout 수동 조작 안내",
-            "A: 왼쪽, D: 오른쪽, SPACE: 발사, ESC: 종료",
-        )
+
         while running:
             # 키 입력 감지
             if keyboard.is_pressed("a"):
@@ -90,10 +92,13 @@ class Breakout(Env):
         save_path = os.path.join(self.save_dir, "ppo_breakout.zip")
 
         model = PPO("CnnPolicy", self.env, verbose=1)
+        total_timesteps = 1000000  # 원하는 학습 스텝 수
+        model.learn(total_timesteps=total_timesteps)
+        model.save(save_path)
+
         episode_rewards = []
         episode_lengths = []
         obs, info = self.env.reset()
-        total_timesteps = 1000000
         timestep = 0
         last_print = 0
         start_time = pytime.time()

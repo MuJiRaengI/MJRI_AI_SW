@@ -343,11 +343,6 @@ class EnvAvoidObserver(gym.Env):
             "vector": np.array(vector_obs, dtype=np.float32),
         }
         return obs
-        obs = [*self.agent_pos]
-        obs += self.get_direction_one_hot(self.agent_pos)
-        for o in self.observers:
-            obs.extend(o)
-        return np.array(obs, dtype=np.float32)
 
     def get_state_tensor(self):
         sw, sh = self.camera_size_px

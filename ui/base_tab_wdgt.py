@@ -20,10 +20,12 @@ from PySide6.QtWidgets import QTabWidget
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QGraphicsScene
 from qt_material import apply_stylesheet
+from PySide6.QtCore import QThread, Signal
 
 from ui.designer.ui_base_tab import Ui_wdgt_base_tab
 from ui.screen_window import Screen
 from source.solution.solution import Solution
+from source.utils.thread import EnvWorker
 
 
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
@@ -160,7 +162,6 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             return None
 
     def slot_btn_env_play(self, mode):
-        # 환경 실행 중인지 인스턴스 변수로 관리
         if self._env_running:
             QMessageBox.warning(
                 self,
@@ -168,16 +169,28 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 "이 솔루션에서 가상 환경이 이미 실행 중입니다. 먼저 기존 환경을 종료하세요.",
             )
             return
+
         self._env_running = True
-        try:
-            env = self._get_env(self.cbox_select_game.currentText())
-            if env is None:
-                self._env_running = False
-                return
-            env = env()
-            env.play(str(self.solution.root / self.solution.name), mode)
-        finally:
+        env_class = self._get_env(self.cbox_select_game.currentText())
+        if env_class is None:
             self._env_running = False
+            return
+
+        if mode == "self_play":
+            info = env_class().key_info()
+            if info:
+                QMessageBox.information(self, "조작법", info)
+
+        # QThread로 실행
+        self._worker = EnvWorker(
+            env_class, str(self.solution.root / self.solution.name), mode
+        )
+        self._worker.finished.connect(self._on_env_finished)
+        self._worker.start()
+
+    def _on_env_finished(self):
+        self._env_running = False
+        QMessageBox.information(self, "완료", "환경 실행이 종료되었습니다.")
 
     def slot_btn_close(self):
         reply = QMessageBox.question(

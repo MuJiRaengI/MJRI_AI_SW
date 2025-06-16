@@ -34,21 +34,13 @@ class FindAvoidObserver:
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
-    def _show_manual_play_message(self):
-        try:
-
-            msg = QtWidgets.QMessageBox()
-            msg.setWindowTitle("키보드 조작 안내")
-            msg.setText(
-                "[조작법] 방향키: D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\nESC: 종료"
-            )
-            msg.setIcon(QtWidgets.QMessageBox.Information)
-            msg.exec()
-        except Exception:
-            pass
+    def key_info(self) -> str:
+        return (
+            "[조작법] 방향키: D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\nESC: 종료\n"
+            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
+        )
 
     def _self_play(self):
-        self._show_manual_play_message()
         env = self.env
         running = True
         while running:
@@ -116,10 +108,13 @@ class FindAvoidObserver:
         log_path = os.path.join(log_dir, "ppo_find_avoid_observer_train_log.json")
         save_path = os.path.join(solution_dir, "ppo_find_avoid_observer.zip")
         model = PPO(FindAvoidObserverPolicy, self.env, verbose=1)
+        total_timesteps = 1000000  # 원하는 학습 스텝 수
+        model.learn(total_timesteps=total_timesteps)
+        model.save(save_path)
+
         episode_rewards = []
         episode_lengths = []
         obs, info = self.env.reset(), {}
-        total_timesteps = 1000000
         timestep = 0
         last_print = 0
         start_time = time.time()

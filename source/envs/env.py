@@ -28,6 +28,11 @@ class Env(abc.ABC):
     def _test(self):
         pass
 
+    @abc.abstractmethod
+    def key_info(self) -> str:
+        """Return key information for manual control."""
+        return "No key information provided."
+
     def play(self, save_dir, mode="random"):
         self.save_dir = save_dir
         self.mode = mode

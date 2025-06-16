@@ -13,6 +13,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from source.envs.env import Env
 import json
+from stable_baselines3.common.callbacks import CheckpointCallback
+from source.env_callback.save_on_step_callback import SaveOnStepCallback
 
 
 class CartPole(Env):
@@ -27,6 +29,12 @@ class CartPole(Env):
         self.obs, self.info = self.env.reset()
         self.done = False
 
+    def key_info(self) -> str:
+        return (
+            "[조작법] A: 왼쪽, D: 오른쪽, ESC: 종료\n"
+            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
+        )
+
     def _self_play(self):
         self.reset()
         running = True
@@ -35,11 +43,7 @@ class CartPole(Env):
         pygame.display.set_caption(
             "CartPole-v1 Controller (A: Left, D: Right, ESC: Quit)"
         )
-        QtWidgets.QMessageBox.information(
-            None,
-            "CartPole 수동 조작 안내",
-            "A: 왼쪽, D: 오른쪽, ESC: 종료 (아무 키도 안누르면 랜덤)",
-        )
+
         while running:
             if keyboard.is_pressed("a"):
                 action = 0  # left
@@ -82,92 +86,24 @@ class CartPole(Env):
         log_dir = os.path.join(self.save_dir, "logs")
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, "ppo_cartpole_train_log.json")
         save_path = os.path.join(self.save_dir, "ppo_cartpole.zip")
 
         model = PPO("MlpPolicy", self.env, verbose=1)
+        total_timesteps = 1000000
 
-        episode_rewards = []
-        episode_lengths = []
-        total_timesteps = 100000
-        timestep = 0
-        last_print = 0
-        start_time = time.time()
-        obs, info = self.env.reset()
-        while timestep < total_timesteps:
-            done = False
-            ep_reward = 0
-            ep_length = 0
-            while not done and timestep < total_timesteps:
-                action, _ = model.predict(obs, deterministic=False)
-                step_result = self.env.step(action)
-                if len(step_result) == 5:
-                    obs, reward, terminated, truncated, info = step_result
-                else:
-                    obs, reward, done, info = step_result
-                    terminated = done
-                    truncated = False
-                self.env.render()
-                ep_reward += reward[0] if isinstance(reward, (list, tuple)) else reward
-                ep_length += 1
-                done = (
-                    terminated[0] or truncated[0]
-                    if isinstance(terminated, (list, tuple))
-                    else terminated or truncated
-                )
-                timestep += 1
-                if timestep % 1000 == 0:
-                    # 중간 저장
-                    model.save(save_path)
-                    progress = timestep / total_timesteps
-                    elapsed = time.time() - start_time
-                    safe_episode_rewards = [float(r) for r in episode_rewards]
-                    safe_episode_lengths = [int(l) for l in episode_lengths]
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        json.dump(
-                            {
-                                "episode_rewards": safe_episode_rewards,
-                                "episode_lengths": safe_episode_lengths,
-                                "timestep": int(timestep),
-                                "progress": float(progress),
-                                "elapsed_seconds": float(elapsed),
-                            },
-                            f,
-                            ensure_ascii=False,
-                            indent=2,
-                        )
-                    print(f"중간 로그가 저장되었습니다: {log_path}")
-                if timestep - last_print >= 1000:
-                    elapsed = time.time() - start_time
-                    percent = 100 * timestep / total_timesteps
-                    print(
-                        f"[Train] Step: {timestep}/{total_timesteps} | Episodes: {len(episode_rewards)} | Last reward: {ep_reward} | Elapsed: {elapsed:.1f}s | Progress: {percent:.1f}%"
-                    )
-                    last_print = timestep
-            episode_rewards.append(ep_reward)
-            episode_lengths.append(ep_length)
-            obs, info = self.env.reset()
-        # 마지막 저장
+        callback = SaveOnStepCallback(
+            save_freq=10000,
+            logging_freq=1000,
+            save_path=self.save_dir,
+            name_prefix="ppo_cartpole",
+            log_dir=log_dir,
+            verbose=1,
+        )
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+        )
         model.save(save_path)
-        progress = timestep / total_timesteps
-        elapsed = time.time() - start_time
-        safe_episode_rewards = [float(r) for r in episode_rewards]
-        safe_episode_lengths = [int(l) for l in episode_lengths]
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "episode_rewards": safe_episode_rewards,
-                    "episode_lengths": safe_episode_lengths,
-                    "timestep": int(timestep),
-                    "progress": float(progress),
-                    "elapsed_seconds": float(elapsed),
-                },
-                f,
-                ensure_ascii=False,
-                indent=2,
-            )
-        print(f"모델이 저장되었습니다: {save_path}")
-        print(f"학습 로그가 저장되었습니다: {log_path}")
         self.env.close()
 
     def _test(self):
