@@ -6,6 +6,12 @@ from qt_material import apply_stylesheet
 
 from ui.main_ui import MainWindow
 
+from source.envs import *
+
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 class MJRIAISW:
     def __init__(self):

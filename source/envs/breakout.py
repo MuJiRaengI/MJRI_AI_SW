@@ -4,7 +4,7 @@ import time as pytime
 
 sys.path.append(os.path.abspath("."))
 
-import gym
+import gymnasium as gym
 import keyboard
 import glob
 import json

@@ -484,6 +484,22 @@
         </item>
        </layout>
       </item>
+      <item row="1" column="0">
+       <widget class="QProgressBar" name="pbar_state">
+        <property name="maximum">
+         <number>1</number>
+        </property>
+        <property name="value">
+         <number>0</number>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+        <property name="textDirection">
+         <enum>QProgressBar::Direction::TopToBottom</enum>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

@@ -33,7 +33,7 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    import gym
+    import gymnasium as gym
     import pygame
     from stable_baselines3 import DQN, PPO
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     env = gym.make("CartPole-v1", render_mode="human")
 
     # 예시로 사용할 에이전트와 환경
-    agent = PPO("MlpPolicy", env, verbose=1)
+    agent = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
     trainer = Trainer(agent, env, episodes=10000)
     trainer.train()

@@ -5,7 +5,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.policies import ActorCriticPolicy
 from .resnet import Resnet18
-import gym
+import gymnasium as gym
 
 
 class ConvBlock(nn.Module):

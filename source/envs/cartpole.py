@@ -4,8 +4,9 @@ import sys
 sys.path.append(os.path.abspath("."))
 
 import random
+import re
 import time
-import gym
+import gymnasium as gym
 import pygame
 import keyboard
 import PySide6.QtWidgets as QtWidgets
@@ -20,107 +21,174 @@ from source.env_callback.save_on_step_callback import SaveOnStepCallback
 class CartPole(Env):
     def __init__(self):
         super().__init__()
-        self.obs, self.info = None, None
-        self.done = False
-
-    def reset(self):
-        pygame.init()
-        self.env = gym.make("CartPole-v1", render_mode="human")
-        self.obs, self.info = self.env.reset()
-        self.done = False
+        self.env_id = "CartPole-v1"
+        self.total_timesteps = 1000000
+        self.n_envs = 8
 
     def key_info(self) -> str:
-        return (
-            "[조작법] A: 왼쪽, D: 오른쪽, ESC: 종료\n"
-            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
-        )
+        return "[조작법] A: 왼쪽, D: 오른쪽\n"
 
     def _self_play(self):
-        self.reset()
-        running = True
-        action = None  # None이면 랜덤, 0: left, 1: right
+        # CartPole-v1 환경 생성 및 수동 플레이 (A, D키로 조작)
+        env = gym.make(self.env_id, render_mode="human")
+        obs, info = env.reset()
         clock = pygame.time.Clock()
-        pygame.display.set_caption(
-            "CartPole-v1 Controller (A: Left, D: Right, ESC: Quit)"
-        )
+        pygame.display.set_caption("CartPole-v1 Manual Play (A: Left, D: Right)")
+        while True:
+            # 윈도우 X(닫기) 이벤트 처리
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
 
-        while running:
+            # render_queue로부터 stop 신호를 받으면 중단
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 키보드 입력 처리
+            action = None
             if keyboard.is_pressed("a"):
-                action = 0  # left
+                action = 0  # 왼쪽
             elif keyboard.is_pressed("d"):
-                action = 1  # right
+                action = 1  # 오른쪽
             else:
-                action = None  # 아무키도 안누르면 랜덤
-            if action is None:
-                action = random.choice([0, 1])
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
+                action = env.action_space.sample()  # 아무 키도 안 누르면 랜덤
+            obs, reward, terminated, truncated, info = env.step(action)
+            env.render()
             if terminated or truncated:
-                obs, info = self.env.reset()
-            if keyboard.is_pressed("esc"):
-                running = False
+                obs, info = env.reset()
             clock.tick(getattr(self, "fps", 30))
-        self.env.close()
+        env.close()
         pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
     def _random_play(self):
-        self.reset()
-        pygame.display.set_caption("CartPole-v1 Random Play (ESC: Quit)")
+        # CartPole-v1 환경 생성 및 랜덤 플레이
+        env = gym.make(self.env_id, render_mode="human")
+        obs, info = env.reset()
         clock = pygame.time.Clock()
-        running = True
-        while running:
-            if keyboard.is_pressed("esc"):
-                running = False
-                continue
-            action = random.choice([0, 1])
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
+        pygame.display.set_caption("CartPole-v1 Random Play")
+        while True:
+            # 윈도우 X(닫기) 이벤트 처리
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
+
+            # render_queue로부터 stop 신호를 받으면 중단
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            action = env.action_space.sample()  # 랜덤 액션
+            obs, reward, terminated, truncated, info = env.step(action)
+            env.render()
             if terminated or truncated:
-                obs, info = self.env.reset()
+                obs, info = env.reset()
             clock.tick(getattr(self, "fps", 30))
-        self.env.close()
+        env.close()
         pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
     def _train(self):
-        self.reset()
-        log_dir = os.path.join(self.save_dir, "logs")
+        log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-        save_path = os.path.join(self.save_dir, "ppo_cartpole.zip")
 
-        model = PPO("MlpPolicy", self.env, verbose=1)
-        total_timesteps = 1000000
+        env = make_vec_env(self.env_id, n_envs=self.n_envs)
+
+        # 진행상황 전달
+        if self.training_queue is not None:
+            self.training_queue.put(("total_steps", self.total_timesteps))
 
         callback = SaveOnStepCallback(
             save_freq=10000,
-            logging_freq=1000,
-            save_path=self.save_dir,
+            logging_freq=10000,
+            save_dir=self.save_dir,
             name_prefix="ppo_cartpole",
             log_dir=log_dir,
+            progress_queue=self.training_queue,
             verbose=1,
         )
-        model.learn(
-            total_timesteps=total_timesteps,
-            callback=callback,
-        )
-        model.save(save_path)
-        self.env.close()
+
+        # 모델 생성 및 학습
+        model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+        model.learn(total_timesteps=self.total_timesteps, callback=callback)
+
+        # 학습 완료 신호
+        if self.training_queue is not None:
+            self.training_queue.put(("done", None))
+
+        # 모델 저장
+        save_path = os.path.join(self.save_dir, "ppo_cartpole.zip")
+        tmp_path = save_path.replace("zip", "tmp")
+        model.save(tmp_path)
+        os.replace(tmp_path, save_path)
+        print(f"모델 저장 완료: {save_path}")
 
     def _test(self):
-        model_path = os.path.join(self.save_dir, "ppo_cartpole.zip")
-        if not os.path.exists(model_path):
-            print(f"모델 파일이 존재하지 않습니다: {model_path}")
-            return
-        model = PPO.load(model_path)
-        self.reset()  # self.env, self.obs, self.info 초기화
-        obs, info = self.env.reset()
+        last_model_path = None
+        model = None
+        env = gym.make(self.env_id, render_mode="human")
+        obs, info = env.reset()
+        clock = pygame.time.Clock()
+        pygame.display.set_caption("CartPole-v1 Test")
         while True:
-            if keyboard.is_pressed("esc"):
-                break
+            # 모델 파일 탐색 및 필요시 reload
+            model_path = os.path.join(self.save_dir, "ppo_cartpole.zip")
+            if not os.path.exists(model_path):
+                max_steps = -1
+                max_steps_path = None
+                for fname in os.listdir(self.save_dir):
+                    match = re.match(r"ppo_cartpole_(\d+)_steps.zip", fname)
+                    if match:
+                        steps = int(match.group(1))
+                        if steps > max_steps:
+                            max_steps = steps
+                            max_steps_path = os.path.join(self.save_dir, fname)
+                if max_steps_path:
+                    model_path = max_steps_path
+            if model_path != last_model_path and os.path.exists(model_path):
+                time.sleep(0.5)  # 잠시 대기 후 모델 로드
+                print(f"모델 업데이트: {model_path}")
+                model = PPO.load(model_path)
+                last_model_path = model_path
+            elif model is None:
+                print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
+                model = PPO("MlpPolicy", gym.make(self.env_id), device="cpu")
+                last_model_path = None
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
+            obs, reward, terminated, truncated, info = env.step(action)
+            env.render()
             if terminated or truncated:
-                obs, info = self.env.reset()
-            time.sleep(1 / getattr(self, "fps", 30))
-        self.env.close()
+                obs, info = env.reset()
+                # 에피소드가 끝나도 env는 유지, 모델만 reload
+                continue
+            clock.tick(getattr(self, "fps", 30))
+        env.close()
+        pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))

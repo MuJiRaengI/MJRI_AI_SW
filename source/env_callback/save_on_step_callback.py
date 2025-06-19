@@ -1,4 +1,5 @@
 from stable_baselines3.common.callbacks import BaseCallback
+from multiprocessing import Queue
 import os
 import time
 import json
@@ -13,30 +14,29 @@ class SaveOnStepCallback(BaseCallback):
         self,
         save_freq: int,
         logging_freq: int,
-        save_path: str,
+        save_dir: str,
         name_prefix: str = "rl_model",
         log_dir: str = None,
+        progress_queue: Queue = None,
         verbose: int = 0,
     ):
         super().__init__(verbose)
         self.save_freq = save_freq
         self.logging_freq = logging_freq
-        self.save_dir = save_path
-        self.save_ckpt_dir = os.path.join(save_path, "ckpt")
+        self.save_dir = save_dir
         self.name_prefix = name_prefix
         self.log_dir = log_dir
         self.episode_rewards = []
         self.episode_lengths = []
         self.last_print = 0
         self.start_time = None
+        self.progress_queue = progress_queue
         os.makedirs(self.save_dir, exist_ok=True)
         if self.log_dir is not None:
             os.makedirs(self.log_dir, exist_ok=True)
 
     def _on_training_start(self) -> None:
         self.start_time = time.time()
-
-        # 클래스 변수로 현재 에피소드 reward/length 누적용 변수 추가
         self._current_ep_reward = 0
         self._current_ep_length = 0
 
@@ -56,9 +56,12 @@ class SaveOnStepCallback(BaseCallback):
         # 중간 세이브 및 로그
         if self.n_calls % self.save_freq == 0:
             model_path = os.path.join(
-                self.save_dir, f"{self.name_prefix}_{self.n_calls}_steps"
+                self.save_dir, f"{self.name_prefix}_{self.n_calls}_steps.zip"
             )
-            self.model.save(model_path)
+
+            tmp_path = model_path.replace("zip", "tmp")
+            self.model.save(tmp_path)
+            os.replace(tmp_path, model_path)
             print(f"Saved model checkpoint to {model_path}")
 
         if self.n_calls % self.logging_freq == 0:
@@ -89,4 +92,7 @@ class SaveOnStepCallback(BaseCallback):
                     f"[Train] Step: {self.num_timesteps} | Episodes: {len(self.episode_rewards)} | Last reward: {self.episode_rewards[-1] if self.episode_rewards else 0} | Elapsed: {elapsed:.1f}s | Progress: {progress*100:.1f}%"
                 )
                 print(f"중간 로그가 저장되었습니다: {log_path}")
+
+            if self.progress_queue is not None:
+                self.progress_queue.put(("progress", self.num_timesteps))
         return True

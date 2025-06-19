@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'base_tabarsAYf.ui'
+## Form generated from reading UI file 'base_tabGbsjlv.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -17,8 +17,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGraphicsView,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-    QPushButton, QSizePolicy, QSpacerItem, QSpinBox,
-    QVBoxLayout, QWidget)
+    QProgressBar, QPushButton, QSizePolicy, QSpacerItem,
+    QSpinBox, QVBoxLayout, QWidget)
 
 class Ui_wdgt_base_tab(object):
     def setupUi(self, wdgt_base_tab):
@@ -298,6 +298,15 @@ class Ui_wdgt_base_tab(object):
 
 
         self.gridLayout_8.addLayout(self.gridLayout_7, 0, 0, 1, 1)
+
+        self.pbar_state = QProgressBar(self.groupBox_3)
+        self.pbar_state.setObjectName(u"pbar_state")
+        self.pbar_state.setMaximum(1)
+        self.pbar_state.setValue(0)
+        self.pbar_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pbar_state.setTextDirection(QProgressBar.Direction.TopToBottom)
+
+        self.gridLayout_8.addWidget(self.pbar_state, 1, 0, 1, 1)
 
 
         self.gridLayout_2.addWidget(self.groupBox_3, 1, 0, 1, 1)

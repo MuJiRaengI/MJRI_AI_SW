@@ -1,5 +1,7 @@
 import os
 import sys
+import multiprocessing
+from multiprocessing import Queue
 
 sys.path.append(os.path.abspath("."))
 import shutil
@@ -28,14 +30,31 @@ from source.solution.solution import Solution
 from source.utils.thread import EnvWorker
 
 
+# 프로세스 실행 함수
+def run_train(env_class, solution_dir, queue=None):
+    env = env_class()
+    env.play(solution_dir, "train", queue)
+
+
+def run_render(env_class, solution_dir, mode, queue=None):
+    env = env_class()
+    env.play(solution_dir, mode, queue)
+
+
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
     def __init__(self, parent=None, solution: Solution = None):
         super().__init__(parent)
-        self._env_running = False
         self.setupUi(self)
         self.solution = solution
         self._screen = Screen()
         self._screen.geometryChanged = self.sync_spinbox_with_screen
+        self._train_process = None
+        self._render_process = None
+        self._training_queue = None
+        self._render_queue = None
+        self._progress_timer = QTimer(self)
+        self._progress_timer.timeout.connect(self._handle_process_signals)
+
         self.spbx_screen_x.setValue(getattr(self.solution, "screen_x", 0))
         self.spbx_screen_y.setValue(getattr(self.solution, "screen_y", 0))
         self.spbx_screen_w.setValue(getattr(self.solution, "screen_w", 0))
@@ -162,35 +181,141 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             return None
 
     def slot_btn_env_play(self, mode):
-        if self._env_running:
-            QMessageBox.warning(
-                self,
-                "실행 중",
-                "이 솔루션에서 가상 환경이 이미 실행 중입니다. 먼저 기존 환경을 종료하세요.",
+        if mode == "train":
+            if self.btn_train.text() == "Stop":
+                reply = QMessageBox.question(
+                    self,
+                    "학습 중단",
+                    "정말 학습을 중단하시겠습니까?",
+                    QMessageBox.Ok | QMessageBox.Cancel,
+                    QMessageBox.Cancel,
+                )
+                if reply == QMessageBox.Ok:
+                    self.stop_train_process()
+                    self.btn_train.setText("Train")
+                return
+            env_class = self._get_env(self.cbox_select_game.currentText())
+            if env_class is None:
+                return
+            solution_dir = str(self.solution.root / self.solution.name)
+            self._training_queue = Queue()
+            self.pbar_state.setMinimum(0)
+            self.pbar_state.setMaximum(0)
+            self.pbar_state.setValue(0)
+            self._train_process = multiprocessing.Process(
+                target=run_train,
+                args=(env_class, solution_dir, self._training_queue),
             )
-            return
+            self._train_process.start()
+            self.btn_train.setText("Stop")
+            self._progress_timer.start(200)
+        elif mode in ("random_play", "self_play", "test"):
+            # 버튼, 라벨 매핑
+            btn_map = {
+                "random_play": self.btn_random_play,
+                "self_play": self.btn_self_play,
+                "test": self.btn_test,
+            }
+            btn = btn_map.get(mode)
+            if btn.text() == "Stop":
+                reply = QMessageBox.question(
+                    self,
+                    "플레이 중단",
+                    f"정말 {mode.replace('_', ' ')}를 중단하시겠습니까?",
+                    QMessageBox.Ok | QMessageBox.Cancel,
+                    QMessageBox.Cancel,
+                )
+                if reply == QMessageBox.Ok:
+                    self.stop_render_process()
+                    btn.setText(self.get_btn_restore_text(btn))
+                return
+            if self._render_process and self._render_process.is_alive():
+                QMessageBox.warning(
+                    self, "실행 중", "직접/랜덤/평가 플레이가 이미 진행 중입니다."
+                )
+                return
+            env_class = self._get_env(self.cbox_select_game.currentText())
+            if env_class is None:
+                return
+            solution_dir = str(self.solution.root / self.solution.name)
 
-        self._env_running = True
-        env_class = self._get_env(self.cbox_select_game.currentText())
-        if env_class is None:
-            self._env_running = False
-            return
+            self._render_queue = Queue()
+            self._render_process = multiprocessing.Process(
+                target=run_render,
+                args=(env_class, solution_dir, mode, self._render_queue),
+            )
+            self._render_process.start()
+            btn.setText("Stop")
+            self._progress_timer.start(200)
 
-        if mode == "self_play":
-            info = env_class().key_info()
-            if info:
-                QMessageBox.information(self, "조작법", info)
+    def _handle_process_signals(self):
+        # 학습 큐 처리
+        if self._training_queue is not None:
+            while not self._training_queue.empty():
+                msg = self._training_queue.get()
+                if not isinstance(msg, tuple) or len(msg) != 2:
+                    continue
+                msg_type, value = msg
+                if msg_type == "total_steps":
+                    self.pbar_state.setMaximum(value)
+                elif msg_type == "progress":
+                    self.pbar_state.setValue(value)
+                elif msg_type == "done":
+                    self._progress_timer.stop()
+                    self.pbar_state.setMinimum(0)
+                    self.pbar_state.setValue(self.pbar_state.maximum())
+                    self.btn_train.setText("Train")
+                    self.stop_train_process()
+                    break
+        # 렌더 큐 처리
+        if self._render_queue is not None:
+            while not self._render_queue.empty():
+                msg = self._render_queue.get()
+                if not isinstance(msg, tuple) or len(msg) != 2:
+                    continue
+                msg_type, value = msg
+                if msg_type == "done":
+                    # 어떤 버튼이 Stop 상태인지 찾아서 복구
+                    for btn in [
+                        self.btn_random_play,
+                        self.btn_self_play,
+                        self.btn_test,
+                    ]:
+                        if btn and btn.text() == "Stop":
+                            self.stop_render_process()
+                            btn.setText(self.get_btn_restore_text(btn))
+                    self._progress_timer.stop()
+                    break
 
-        # QThread로 실행
-        self._worker = EnvWorker(
-            env_class, str(self.solution.root / self.solution.name), mode
+    def get_btn_restore_text(self, btn):
+        btn_text = (
+            btn.objectName().replace("btn_", "").replace("_play", "").capitalize()
         )
-        self._worker.finished.connect(self._on_env_finished)
-        self._worker.start()
+        if btn_text.lower() != "test":
+            btn_text += " Play"
+        return btn_text
 
-    def _on_env_finished(self):
-        self._env_running = False
-        QMessageBox.information(self, "완료", "환경 실행이 종료되었습니다.")
+    def stop_train_process(self):
+        if self._train_process and self._train_process.is_alive():
+            self.pbar_state.setMinimum(0)
+            self.pbar_state.setMaximum(1)
+            self.pbar_state.setValue(1)
+            self._train_process.terminate()
+            self._train_process.join()
+            QMessageBox.information(self, "중단", "학습이 중단되었습니다.")
+        else:
+            QMessageBox.information(self, "중단", "진행 중인 학습이 없습니다.")
+        self._progress_timer.stop()
+        self._training_queue = None
+
+    def stop_render_process(self):
+        if self._render_process and self._render_process.is_alive():
+            self._render_process.terminate()
+            self._render_process.join()
+        else:
+            QMessageBox.information(self, "중단", "진행 중인 플레이/평가가 없습니다.")
+        self._progress_timer.stop()
+        self._render_process = None
 
     def slot_btn_close(self):
         reply = QMessageBox.question(
@@ -319,12 +444,8 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self._preview_timer.start(int(1000 / self.fps_real_time_view))
         update_preview()
 
-    def sync_spinbox_to_solution(self):
-        pass
-
     def slot_target_window_changed(self, text):
         self._clamp_spinbox_to_target_window()
-        pass
 
     def sync_spinbox_with_screen(self):
         geom = self._screen.geometry()
