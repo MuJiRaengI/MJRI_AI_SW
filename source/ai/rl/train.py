@@ -33,7 +33,7 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    import gymnasium as gym
+    import gym
     import pygame
     from stable_baselines3 import DQN, PPO
 

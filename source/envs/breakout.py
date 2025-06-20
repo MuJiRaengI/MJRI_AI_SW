@@ -1,198 +1,264 @@
 import os
 import sys
-import time as pytime
 
 sys.path.append(os.path.abspath("."))
 
-import gymnasium as gym
+import re
+import time
+import gym
 import keyboard
-import glob
-import json
-
-import PySide6.QtWidgets as QtWidgets
-
+import pygame
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-
-from stable_baselines3.common.callbacks import CheckpointCallback
-
-from stable_baselines3.common.callbacks import BaseCallback
-
 from source.envs.env import Env
+from source.env_callback.save_on_step_callback import SaveOnStepCallback
 
 
 class Breakout(Env):
     def __init__(self):
         super().__init__()
-        self.obs, self.info = None, None
-        self.done = False
-        self.fps = 60
-
-    def reset(self):
-        # self.env = gym.make("ALE/Breakout-v5", render_mode="human")
-        self.env = gym.make("Breakout-v0", render_mode="human")
-        self.obs, self.info = self.env.reset()
-        self.done = False
+        self.env_id = "Breakout-v4"
+        self.total_timesteps = 10000000
+        self.save_freq = 5000
+        self.logging_freq = 1000
+        self.n_envs = 8
+        self.scale = 4
 
     def key_info(self) -> str:
-        return (
-            "[조작법] A: 왼쪽, D: 오른쪽, SPACE: 발사, ESC: 종료\n"
-            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
-        )
+        return "[조작법] A: 왼쪽, D: 오른쪽, SPACE: FIRE(시작/재시작)\n"
 
     def _self_play(self):
-        self.reset()
+        env = gym.make(self.env_id, render_mode="rgb_array")
+        env.metadata["render_fps"] = self.fps
+        obs, info = env.reset()
+
+        pygame.init()
+        frame = env.render()
+        h, w, _ = frame.shape
+        h, w = h * self.scale, w * self.scale
+        screen = pygame.display.set_mode((h, w))
+        pygame.display.set_caption(
+            "Breakout Manual Play (A: Left, D: Right, SPACE: Fire)"
+        )
+        clock = pygame.time.Clock()
+
         running = True
         action = 0
 
         while running:
-            # 키 입력 감지
-            if keyboard.is_pressed("a"):
+            # 윈도우 종료 처리
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
+
+            # render_queue로부터 stop 신호를 받으면 중단
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 키보드 입력 처리 (pygame 방식)
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_a]:
                 action = 3  # LEFT
-            elif keyboard.is_pressed("d"):
+            elif keys[pygame.K_d]:
                 action = 2  # RIGHT
-            elif keyboard.is_pressed("space"):
+            elif keys[pygame.K_SPACE]:
                 action = 1  # FIRE
             else:
                 action = 0  # NOOP
 
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
+            # 환경 업데이트
+            obs, reward, terminated, truncated, info = env.step(action)
+            frame = env.render()
+
+            # 화면 출력
+            # surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
+            # screen.blit(surface, (0, 0))
+            scaled_frame = pygame.transform.scale(
+                pygame.surfarray.make_surface(frame.swapaxes(0, 1)),
+                (h, w),
+            )
+            screen.blit(scaled_frame, (0, 0))
+            pygame.display.flip()
+
+            # 에피소드 끝났으면 리셋
             if terminated or truncated:
-                self.env.reset()
+                obs, info = env.reset()
 
-            if keyboard.is_pressed("esc"):
-                running = False
+            clock.tick(self.fps)
 
-            pytime.sleep(1 / self.fps)
-
-        self.env.close()
+        env.close()
+        pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
     def _random_play(self):
-        self.reset()
+        env = gym.make(self.env_id, render_mode="rgb_array")
+        env.metadata["render_fps"] = self.fps
+        obs, info = env.reset()
+
+        pygame.init()
+        frame = env.render()
+        h, w, _ = frame.shape
+        h, w = h * self.scale, w * self.scale
+        screen = pygame.display.set_mode((h, w))
+        pygame.display.set_caption("Breakout Random Play (Pygame UI)")
+        clock = pygame.time.Clock()
+
         running = True
         while running:
-            if keyboard.is_pressed("esc"):
-                running = False
-                continue
-            action = self.env.action_space.sample()
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
+
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 랜덤 액션
+            action = env.action_space.sample()
+            obs, reward, terminated, truncated, info = env.step(action)
+            frame = env.render()
+
+            scaled_frame = pygame.transform.scale(
+                pygame.surfarray.make_surface(frame.swapaxes(0, 1)),
+                (h, w),
+            )
+            screen.blit(scaled_frame, (0, 0))
+            pygame.display.flip()
+
             if terminated or truncated:
-                self.env.reset()
-            pytime.sleep(1 / getattr(self, "fps", 30))
-        self.env.close()
+                obs, info = env.reset()
+
+            clock.tick(self.fps)
+
+        env.close()
+        pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
     def _train(self):
-        self.reset()
-        log_dir = os.path.join(self.save_dir, "logs")
+        log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, "ppo_breakout_train_log.json")
+
+        env = make_vec_env(self.env_id, n_envs=self.n_envs)
+
+        # 진행상황 전달
+        if self.training_queue is not None:
+            self.training_queue.put(("total_steps", self.total_timesteps))
+
+        callback = SaveOnStepCallback(
+            save_freq=self.save_freq,
+            logging_freq=self.logging_freq,
+            save_dir=self.save_dir,
+            name_prefix="ppo_breakout",
+            log_dir=log_dir,
+            progress_queue=self.training_queue,
+            verbose=1,
+        )
+        # 모델 생성 및 학습
+        model = PPO("CnnPolicy", env, verbose=1, device="cuda")
+        model.learn(total_timesteps=self.total_timesteps, callback=callback)
+
+        # 학습 완료 신호
+        if self.training_queue is not None:
+            self.training_queue.put(("done", None))
+
+        # 모델 저장
         save_path = os.path.join(self.save_dir, "ppo_breakout.zip")
+        tmp_path = save_path.replace("zip", "tmp")
+        model.save(tmp_path)
+        os.replace(tmp_path, save_path)
+        print(f"모델 저장 완료: {save_path}")
 
-        model = PPO("CnnPolicy", self.env, verbose=1)
-        total_timesteps = 1000000  # 원하는 학습 스텝 수
-        model.learn(total_timesteps=total_timesteps)
-        model.save(save_path)
+    def _test(self):
+        last_model_path = None
+        model = None
+        env = gym.make(self.env_id, render_mode="rgb_array")
+        env.metadata["render_fps"] = self.fps
+        obs, info = env.reset()
 
-        episode_rewards = []
-        episode_lengths = []
-        obs, info = self.env.reset()
-        timestep = 0
-        last_print = 0
-        start_time = pytime.time()
-        while timestep < total_timesteps:
-            done = False
-            ep_reward = 0
-            ep_length = 0
-            while not done and timestep < total_timesteps:
-                action, _ = model.predict(obs, deterministic=False)
-                obs, reward, terminated, truncated, info = self.env.step(action)
-                self.env.render()
-                ep_reward += reward
-                ep_length += 1
-                done = terminated or truncated
-                timestep += 1
-                if timestep % 1000 == 0:
-                    # 중간 저장
-                    model.save(save_path)
-                    progress = timestep / total_timesteps
-                    elapsed = pytime.time() - start_time
-                    safe_episode_rewards = [float(r) for r in episode_rewards]
-                    safe_episode_lengths = [int(l) for l in episode_lengths]
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        json.dump(
-                            {
-                                "episode_rewards": safe_episode_rewards,
-                                "episode_lengths": safe_episode_lengths,
-                                "timestep": int(timestep),
-                                "progress": float(progress),
-                                "elapsed_seconds": float(elapsed),
-                            },
-                            f,
-                            ensure_ascii=False,
-                            indent=2,
-                        )
-                    print(f"중간 로그가 저장되었습니다: {log_path}")
-                # 진행상황 출력 (1000스텝마다)
-                if timestep - last_print >= 1000:
-                    elapsed = pytime.time() - start_time
-                    percent = 100 * timestep / total_timesteps
-                    print(
-                        f"[Train] Step: {timestep}/{total_timesteps} | Episodes: {len(episode_rewards)} | Last reward: {ep_reward} | Elapsed: {elapsed:.1f}s | Progress: {percent:.1f}%"
-                    )
-                    last_print = timestep
-            episode_rewards.append(ep_reward)
-            episode_lengths.append(ep_length)
-            obs, info = self.env.reset()
-        # 마지막 저장
-        model.save(save_path)
-        progress = timestep / total_timesteps
-        elapsed = pytime.time() - start_time
-        safe_episode_rewards = [float(r) for r in episode_rewards]
-        safe_episode_lengths = [int(l) for l in episode_lengths]
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "episode_rewards": safe_episode_rewards,
-                    "episode_lengths": safe_episode_lengths,
-                    "timestep": int(timestep),
-                    "progress": float(progress),
-                    "elapsed_seconds": float(elapsed),
-                },
-                f,
-                ensure_ascii=False,
-                indent=2,
+        pygame.init()
+        frame = env.render()
+        h, w, _ = frame.shape
+        h, w = h * self.scale, w * self.scale
+        screen = pygame.display.set_mode((h, w))
+        pygame.display.set_caption("Breakout Test (Pygame UI)")
+        clock = pygame.time.Clock()
+
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    if self.render_queue is not None:
+                        self.render_queue.put(("done", None))
+                    return
+
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 모델 파일 탐색 및 필요시 reload
+            model_path = os.path.join(self.save_dir, "ppo_breakout.zip")
+            if not os.path.exists(model_path):
+                max_steps = -1
+                max_steps_path = None
+                for fname in os.listdir(self.save_dir):
+                    match = re.match(r"ppo_breakout_(\d+)_steps.zip", fname)
+                    if match:
+                        steps = int(match.group(1))
+                        if steps > max_steps:
+                            max_steps = steps
+                            max_steps_path = os.path.join(self.save_dir, fname)
+                if max_steps_path:
+                    model_path = max_steps_path
+            if model_path != last_model_path and os.path.exists(model_path):
+                time.sleep(0.5)  # 잠시 대기 후 모델 로드
+                print(f"모델 업데이트: {model_path}")
+                model = PPO.load(model_path)
+                last_model_path = model_path
+            elif model is None:
+                print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
+                model = PPO("CnnPolicy", env, verbose=1, device="cuda")
+                last_model_path = None
+
+            # 모델 예측
+            action, _ = model.predict(obs, deterministic=False)
+            obs, reward, terminated, truncated, info = env.step(action)
+            frame = env.render()
+
+            scaled_frame = pygame.transform.scale(
+                pygame.surfarray.make_surface(frame.swapaxes(0, 1)),
+                (h, w),
             )
-        print(f"모델이 저장되었습니다: {save_path}")
-        print(f"학습 로그가 저장되었습니다: {log_path}")
-        self.env.close()
+            screen.blit(scaled_frame, (0, 0))
+            pygame.display.flip()
 
-    def _test(self, model_path=None):
-        if model_path is None:
-            ckpts = sorted(
-                glob.glob(os.path.join(self.save_dir, "ppo_breakout_checkpoint_*.zip")),
-                reverse=True,
-            )
-            if ckpts:
-                model_path = ckpts[0]
-            else:
-                model_path = os.path.join(self.save_dir, "ppo_breakout.zip")
-        if not os.path.exists(model_path):
-            print(f"모델 파일이 존재하지 않습니다: {model_path}")
-            return
-        print(f"불러온 모델: {model_path}")
-        model = PPO.load(model_path)
-        self.reset()
-        obs, info = self.env.reset()
-        while True:
-            if keyboard.is_pressed("esc"):
-                break
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            self.env.render()
             if terminated or truncated:
-                obs, info = self.env.reset()
-            pytime.sleep(1 / getattr(self, "fps", 30))
-        self.env.close()
+                obs, info = env.reset()
+
+            clock.tick(self.fps)
+
+        env.close()
+        pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
+
+
+if __name__ == "__main__":
+    breakout = Breakout()
+    breakout._self_play()

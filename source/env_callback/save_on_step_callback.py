@@ -3,6 +3,7 @@ from multiprocessing import Queue
 import os
 import time
 import json
+import re
 
 
 class SaveOnStepCallback(BaseCallback):
@@ -63,6 +64,22 @@ class SaveOnStepCallback(BaseCallback):
             self.model.save(tmp_path)
             os.replace(tmp_path, model_path)
             print(f"Saved model checkpoint to {model_path}")
+
+            # 최근 5개만 남기고 이전 체크포인트 삭제
+            checkpoints = [
+                fname
+                for fname in os.listdir(self.save_dir)
+                if fname.startswith(self.name_prefix) and fname.endswith("_steps.zip")
+            ]
+            checkpoints.sort(
+                key=lambda x: int(re.search(r"_(\d+)_steps\\.zip", x).group(1))
+            )
+            for old_ckpt in checkpoints[:-5]:
+                try:
+                    os.remove(os.path.join(self.save_dir, old_ckpt))
+                    print(f"Removed old checkpoint: {old_ckpt}")
+                except Exception as e:
+                    print(f"Could not remove old checkpoint {old_ckpt}: {e}")
 
         if self.n_calls % self.logging_freq == 0:
             elapsed = time.time() - self.start_time if self.start_time else 0

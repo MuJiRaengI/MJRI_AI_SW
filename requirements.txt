@@ -1,3 +1,6 @@
+gym
+gym[atari]
+autorom
 pyside6
 pywin32
 opencv-python
@@ -12,7 +15,8 @@ accelerate
 bitsandbytes
 sounddevice
 soundfile
-gymnasium
+ale-py
 pygame
 stable-baselines3[extra]
 keyboard
+numpy==1.23.5

@@ -234,10 +234,19 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                     self, "실행 중", "직접/랜덤/평가 플레이가 이미 진행 중입니다."
                 )
                 return
+
             env_class = self._get_env(self.cbox_select_game.currentText())
             if env_class is None:
                 return
             solution_dir = str(self.solution.root / self.solution.name)
+
+            # 조작법 설명
+            if mode == "self_play":
+                key_info = env_class().key_info()
+                if key_info:
+                    QMessageBox.information(
+                        self, "조작법", f"{env_class.__name__} 조작법:\n{key_info}"
+                    )
 
             self._render_queue = Queue()
             self._render_process = multiprocessing.Process(

@@ -4,6 +4,7 @@ import abc
 class Env(abc.ABC):
     def __init__(self):
         self.fps = 30
+        self.scale = 1
         self.mode = None
         self.save_dir = None
         self.training_queue = None

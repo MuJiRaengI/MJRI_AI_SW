@@ -3,18 +3,14 @@ import sys
 
 sys.path.append(os.path.abspath("."))
 
-import random
 import re
 import time
-import gymnasium as gym
+import gym
 import pygame
 import keyboard
-import PySide6.QtWidgets as QtWidgets
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from source.envs.env import Env
-import json
-from stable_baselines3.common.callbacks import CheckpointCallback
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
 
 
@@ -62,7 +58,7 @@ class CartPole(Env):
             env.render()
             if terminated or truncated:
                 obs, info = env.reset()
-            clock.tick(getattr(self, "fps", 30))
+            clock.tick(self.fps)
         env.close()
         pygame.quit()
         if self.render_queue is not None:
