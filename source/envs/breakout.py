@@ -168,7 +168,7 @@ class Breakout(Env):
             verbose=1,
         )
         # 모델 생성 및 학습
-        model = PPO("CnnPolicy", env, verbose=1, device="cuda")
+        model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
         model.learn(total_timesteps=self.total_timesteps, callback=callback)
 
         # 학습 완료 신호

@@ -41,6 +41,10 @@ class SaveOnStepCallback(BaseCallback):
         self._current_ep_reward = 0
         self._current_ep_length = 0
 
+    def extract_step(self, fname: str) -> int:
+        match = re.search(r"_(\d+)_steps\.zip", fname)
+        return int(match.group(1)) if match else -1
+
     def _on_step(self) -> bool:
         # step마다 reward 누적
         rewards = self.locals["rewards"]
@@ -69,11 +73,12 @@ class SaveOnStepCallback(BaseCallback):
             checkpoints = [
                 fname
                 for fname in os.listdir(self.save_dir)
-                if fname.startswith(self.name_prefix) and fname.endswith("_steps.zip")
+                if fname.startswith(self.name_prefix)
+                and fname.endswith("_steps.zip")
+                and re.search(r"_(\d+)_steps\.zip", fname)
             ]
-            checkpoints.sort(
-                key=lambda x: int(re.search(r"_(\d+)_steps\\.zip", x).group(1))
-            )
+            checkpoints.sort(key=self.extract_step)
+            print(checkpoints)
             for old_ckpt in checkpoints[:-5]:
                 try:
                     os.remove(os.path.join(self.save_dir, old_ckpt))
