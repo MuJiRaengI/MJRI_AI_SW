@@ -20,3 +20,6 @@ pygame
 stable-baselines3[extra]
 keyboard
 numpy==1.23.5
+google-cloud-texttospeech
+pydub 
+emoji

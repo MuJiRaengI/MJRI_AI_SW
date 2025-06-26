@@ -8,6 +8,7 @@ New_Solution*/
 *.wav
 test.py
 *.zip
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

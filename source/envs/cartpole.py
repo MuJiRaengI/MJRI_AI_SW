@@ -176,7 +176,7 @@ class CartPole(Env):
                 msg = self.render_queue.get()
                 if isinstance(msg, tuple) and msg[0] == "stop":
                     break
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=False)
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()
             if terminated or truncated:

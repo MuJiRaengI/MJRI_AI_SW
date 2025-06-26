@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainvYQHzN.ui'
+## Form generated from reading UI file 'mainSFOqXO.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -27,6 +27,10 @@ class Ui_main_window(object):
         main_window.resize(718, 483)
         self.actionStart = QAction(main_window)
         self.actionStart.setObjectName(u"actionStart")
+        self.actionUpdate_DB = QAction(main_window)
+        self.actionUpdate_DB.setObjectName(u"actionUpdate_DB")
+        self.actionStop = QAction(main_window)
+        self.actionStop.setObjectName(u"actionStop")
         self.centralwidget = QWidget(main_window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_2 = QGridLayout(self.centralwidget)
@@ -90,7 +94,9 @@ class Ui_main_window(object):
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuView.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
+        self.menuHelp.addAction(self.actionUpdate_DB)
         self.menuHelp.addAction(self.actionStart)
+        self.menuHelp.addAction(self.actionStop)
 
         self.retranslateUi(main_window)
 
@@ -102,7 +108,9 @@ class Ui_main_window(object):
 
     def retranslateUi(self, main_window):
         main_window.setWindowTitle(QCoreApplication.translate("main_window", u"MJRI AI Software", None))
-        self.actionStart.setText(QCoreApplication.translate("main_window", u"Start", None))
+        self.actionStart.setText(QCoreApplication.translate("main_window", u"Start LLM", None))
+        self.actionUpdate_DB.setText(QCoreApplication.translate("main_window", u"Update DB", None))
+        self.actionStop.setText(QCoreApplication.translate("main_window", u"Stop LLM", None))
         self.btn_new_solution.setText(QCoreApplication.translate("main_window", u"New Solution", None))
         self.btn_open_solution.setText(QCoreApplication.translate("main_window", u"Open Solution", None))
         self.tblw_main.setTabText(self.tblw_main.indexOf(self.tab), QCoreApplication.translate("main_window", u"Home", None))

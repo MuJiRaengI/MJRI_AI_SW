@@ -12,6 +12,11 @@ import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+import torch
+
+GPU_MEMORY = 8
+torch.cuda.set_per_process_memory_fraction(GPU_MEMORY / 12, device=0)
+
 
 class MJRIAISW:
     def __init__(self):

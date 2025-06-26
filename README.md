@@ -12,5 +12,11 @@ link : https://pytorch.org/get-started/locally/
 `pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126`
 
 
+TTS 설치 방법
+```
+git clone https://github.com/myshell-ai/MeloTTS.git
+cd MeloTTS
+pip install -e .
+python -m unidic download
 
-`python -m unidic download`
+```

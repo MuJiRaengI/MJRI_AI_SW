@@ -9,17 +9,21 @@ import gym
 import keyboard
 import pygame
 from stable_baselines3 import PPO
+from source.ai.rl.model.breakout import BreakoutResnet
 from stable_baselines3.common.env_util import make_vec_env
 from source.envs.env import Env
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
+from stable_baselines3.common.atari_wrappers import AtariWrapper
+from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 
 
 class Breakout(Env):
     def __init__(self):
         super().__init__()
         self.env_id = "Breakout-v4"
-        self.total_timesteps = 10000000
-        self.save_freq = 5000
+        self.total_timesteps = 50000000
+        # self.save_freq = 5000
+        self.save_freq = 1000
         self.logging_freq = 1000
         self.n_envs = 8
         self.scale = 4
@@ -153,6 +157,7 @@ class Breakout(Env):
             os.makedirs(log_dir, exist_ok=True)
 
         env = make_vec_env(self.env_id, n_envs=self.n_envs)
+        env = VecFrameStack(env, n_stack=4)
 
         # 진행상황 전달
         if self.training_queue is not None:
@@ -168,7 +173,25 @@ class Breakout(Env):
             verbose=1,
         )
         # 모델 생성 및 학습
-        model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
+        # model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
+
+        policy_kwargs = dict(
+            features_extractor_class=BreakoutResnet,
+            features_extractor_kwargs=dict(features_dim=64),
+        )
+
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_2166000_steps.zip"
+        if os.path.exists(model_path):
+            print(f"기존 모델을 불러옵니다: {model_path}")
+            model = PPO.load(model_path, env=env, policy=BreakoutResnet, device="cuda")
+        else:
+            model = PPO(
+                "CnnPolicy",
+                env,
+                policy_kwargs=policy_kwargs,
+                device="cuda",
+                verbose=1,
+            )
         model.learn(total_timesteps=self.total_timesteps, callback=callback)
 
         # 학습 완료 신호
@@ -229,15 +252,27 @@ class Breakout(Env):
             if model_path != last_model_path and os.path.exists(model_path):
                 time.sleep(0.5)  # 잠시 대기 후 모델 로드
                 print(f"모델 업데이트: {model_path}")
-                model = PPO.load(model_path)
+                # model = PPO.load(model_path)
+                model = PPO.load(model_path, policy=BreakoutResnet, device="cuda")
                 last_model_path = model_path
             elif model is None:
                 print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
-                model = PPO("CnnPolicy", env, verbose=1, device="cuda")
+                # model = PPO("CnnPolicy", env, verbose=1, device="cuda")
+                policy_kwargs = dict(
+                    features_extractor_class=BreakoutResnet,
+                    features_extractor_kwargs=dict(features_dim=64),
+                )
+                model = PPO(
+                    "CnnPolicy",
+                    env,
+                    policy_kwargs=policy_kwargs,
+                    device="cuda",
+                    verbose=1,
+                )
                 last_model_path = None
 
             # 모델 예측
-            action, _ = model.predict(obs, deterministic=False)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = env.step(action)
             frame = env.render()
 
@@ -261,4 +296,6 @@ class Breakout(Env):
 
 if __name__ == "__main__":
     breakout = Breakout()
-    breakout._self_play()
+    breakout.save_dir = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\test"
+    breakout.log_dir = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\test\logs"
+    breakout._train()
