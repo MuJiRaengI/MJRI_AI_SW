@@ -27,6 +27,7 @@ class Breakout(Env):
         self.logging_freq = 1000
         self.n_envs = 8
         self.scale = 4
+        self.n_stack = 8
 
     def key_info(self) -> str:
         return "[조작법] A: 왼쪽, D: 오른쪽, SPACE: FIRE(시작/재시작)\n"
@@ -157,7 +158,7 @@ class Breakout(Env):
             os.makedirs(log_dir, exist_ok=True)
 
         env = make_vec_env(self.env_id, n_envs=self.n_envs)
-        env = VecFrameStack(env, n_stack=4)
+        env = VecFrameStack(env, n_stack=self.n_stack)
 
         # 진행상황 전달
         if self.training_queue is not None:
@@ -180,7 +181,7 @@ class Breakout(Env):
             features_extractor_kwargs=dict(features_dim=64),
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_2166000_steps.zip"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_460000_steps.zip"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             model = PPO.load(model_path, env=env, policy=BreakoutResnet, device="cuda")
@@ -191,6 +192,16 @@ class Breakout(Env):
                 policy_kwargs=policy_kwargs,
                 device="cuda",
                 verbose=1,
+                n_steps=128,  # rollout buffer size (default: 2048, Atari에서는 128~256 추천)
+                batch_size=256,  # minibatch size (default: 64, Atari에서는 256~1024 추천)
+                n_epochs=4,  # update epochs (default: 10, Atari에서는 4~6 추천)
+                gamma=0.99,  # discount factor
+                gae_lambda=0.95,  # GAE lambda
+                ent_coef=0.01,  # entropy coefficient (default: 0.0, exploration 증가)
+                learning_rate=2.5e-4,  # learning rate (Atari 논문/Stable-Baselines3 권장)
+                clip_range=0.1,  # policy clip range (default: 0.2, Atari에서는 0.1~0.2)
+                vf_coef=0.5,  # value function loss coefficient
+                max_grad_norm=0.5,  # gradient clipping
             )
         model.learn(total_timesteps=self.total_timesteps, callback=callback)
 
@@ -208,12 +219,13 @@ class Breakout(Env):
     def _test(self):
         last_model_path = None
         model = None
-        env = gym.make(self.env_id, render_mode="rgb_array")
-        env.metadata["render_fps"] = self.fps
-        obs, info = env.reset()
+        # 학습과 동일하게 VecFrameStack 적용
+        env = DummyVecEnv([lambda: gym.make(self.env_id, render_mode="rgb_array")])
+        env = VecFrameStack(env, n_stack=self.n_stack)
+        obs = env.reset()
 
         pygame.init()
-        frame = env.render()
+        frame = env.envs[0].render()
         h, w, _ = frame.shape
         h, w = h * self.scale, w * self.scale
         screen = pygame.display.set_mode((h, w))
@@ -241,7 +253,7 @@ class Breakout(Env):
                 max_steps = -1
                 max_steps_path = None
                 for fname in os.listdir(self.save_dir):
-                    match = re.match(r"ppo_breakout_(\d+)_steps.zip", fname)
+                    match = re.match(r"ppo_breakout_best_(\d+)_\d+\.zip", fname)
                     if match:
                         steps = int(match.group(1))
                         if steps > max_steps:
@@ -252,12 +264,10 @@ class Breakout(Env):
             if model_path != last_model_path and os.path.exists(model_path):
                 time.sleep(0.5)  # 잠시 대기 후 모델 로드
                 print(f"모델 업데이트: {model_path}")
-                # model = PPO.load(model_path)
                 model = PPO.load(model_path, policy=BreakoutResnet, device="cuda")
                 last_model_path = model_path
             elif model is None:
                 print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
-                # model = PPO("CnnPolicy", env, verbose=1, device="cuda")
                 policy_kwargs = dict(
                     features_extractor_class=BreakoutResnet,
                     features_extractor_kwargs=dict(features_dim=64),
@@ -273,8 +283,8 @@ class Breakout(Env):
 
             # 모델 예측
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            frame = env.render()
+            obs, reward, done, info = env.step(action)
+            frame = env.envs[0].render()
 
             scaled_frame = pygame.transform.scale(
                 pygame.surfarray.make_surface(frame.swapaxes(0, 1)),
@@ -283,8 +293,8 @@ class Breakout(Env):
             screen.blit(scaled_frame, (0, 0))
             pygame.display.flip()
 
-            if terminated or truncated:
-                obs, info = env.reset()
+            if done[0]:
+                obs = env.reset()
 
             clock.tick(self.fps)
 

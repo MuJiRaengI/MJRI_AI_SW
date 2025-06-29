@@ -30,7 +30,9 @@ class MJRIBot:
         )
         self.log_path = log_path
         self.model_id = "naver-hyperclovax/HyperCLOVAX-SEED-Vision-Instruct-3B"
-        self.voice_file_name = os.path.abspath(r"answer.wav")
+        self.voice_file_name = os.path.abspath(
+            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\answer.wav"
+        )
 
         self.model = None
         self.tokenizer = None
@@ -153,7 +155,7 @@ if __name__ == "__main__":
     mjri_bot.start()
     # image_path = "테스트.png"
     nickname = "무지랭이"
-    text = "오늘 나의 생방송이 끝이 났어. 시청자분들께 감사의 한말씀 부탁해"
+    text = "내가 워든 사냥을 갔는데 3번쨰 갔거든? 근데 또 죽어버렸어. 워든이 타겟팅을 바꿔서 철 골램이랑 싸우다 말고 나를 떄라더라고.. 너무 화가나 응원을 해줘. 그리고 마지막으로 시청자님들꼐 인사를 해줘."
     # text = "AI가 어떻게 대답함?"
 
     print("3초 대기")
@@ -163,10 +165,10 @@ if __name__ == "__main__":
 
     # print(f"{nickname}님이 질문: {text}")
     time.sleep(5)  # 질문 대기
-    for i in range(10):
-        mjri_bot.append_text(f"무지랭이{i + 1}", f"테스트 질문 {i + 1}번쨰  질문이야")
-    mjri_bot.stop()
-    time.sleep(40)  # 대기 후 답변 출력
+    # for i in range(10):
+    #     mjri_bot.append_text(f"무지랭이{i + 1}", f"테스트 질문 {i + 1}번쨰  질문이야")
+    # mjri_bot.stop()
+    time.sleep(140)  # 대기 후 답변 출력
     print("끝")
 
     # # answer = mjri_bot.chat(nickname, text)

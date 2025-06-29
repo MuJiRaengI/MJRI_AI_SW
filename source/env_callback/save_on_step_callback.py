@@ -4,11 +4,14 @@ import os
 import time
 import json
 import re
+import gc
+import torch
+import psutil
 
 
 class SaveOnStepCallback(BaseCallback):
     """
-    Custom callback for saving a model every `save_freq` steps, and logging progress/episode info to json and console.
+    Custom callback for saving a model when ep_rew_mean improves, and logging progress/episode info to json and console.
     """
 
     def __init__(
@@ -27,11 +30,13 @@ class SaveOnStepCallback(BaseCallback):
         self.save_dir = save_dir
         self.name_prefix = name_prefix
         self.log_dir = log_dir
+        self.max_log_length = 1000
         self.episode_rewards = []
         self.episode_lengths = []
         self.last_print = 0
         self.start_time = None
         self.progress_queue = progress_queue
+        self.best_mean_reward = -float("inf")  # 최고 평균 보상
         os.makedirs(self.save_dir, exist_ok=True)
         if self.log_dir is not None:
             os.makedirs(self.log_dir, exist_ok=True)
@@ -54,39 +59,38 @@ class SaveOnStepCallback(BaseCallback):
             self._current_ep_length += 1
             if done:
                 self.episode_rewards.append(self._current_ep_reward)
+                self.episode_rewards = self.episode_rewards[-self.max_log_length :]
                 self.episode_lengths.append(self._current_ep_length)
+                self.episode_lengths = self.episode_lengths[-self.max_log_length :]
                 self._current_ep_reward = 0
                 self._current_ep_length = 0
 
-        # 중간 세이브 및 로그
-        if self.n_calls % self.save_freq == 0:
-            model_path = os.path.join(
-                self.save_dir, f"{self.name_prefix}_{self.n_calls}_steps.zip"
+        # ep_rew_mean이 갱신될 때만 저장
+        if len(self.episode_rewards) >= 10:
+            ep_rew_mean = sum(self.episode_rewards[-100:]) / min(
+                len(self.episode_rewards), 100
             )
-
-            tmp_path = model_path.replace("zip", "tmp")
-            self.model.save(tmp_path)
-            os.replace(tmp_path, model_path)
-            print(f"Saved model checkpoint to {model_path}")
-
-            # 최근 5개만 남기고 이전 체크포인트 삭제
-            checkpoints = [
-                fname
-                for fname in os.listdir(self.save_dir)
-                if fname.startswith(self.name_prefix)
-                and fname.endswith("_steps.zip")
-                and re.search(r"_(\d+)_steps\.zip", fname)
-            ]
-            checkpoints.sort(key=self.extract_step)
-            print(checkpoints)
-            for old_ckpt in checkpoints[:-5]:
+            if ep_rew_mean > self.best_mean_reward:
+                self.best_mean_reward = ep_rew_mean
+                gc.collect()
+                model_path = os.path.join(
+                    self.save_dir,
+                    f"{self.name_prefix}_best_{int(self.num_timesteps)}_{int(ep_rew_mean)}.zip",
+                )
+                tmp_path = model_path.replace("zip", "tmp")
+                with torch.no_grad():
+                    self.model.save(tmp_path)
                 try:
-                    os.remove(os.path.join(self.save_dir, old_ckpt))
-                    print(f"Removed old checkpoint: {old_ckpt}")
+                    os.replace(tmp_path, model_path)
                 except Exception as e:
-                    print(f"Could not remove old checkpoint {old_ckpt}: {e}")
+                    print(f"[ERROR] 파일 교체 실패: {e}")
+                print(
+                    f"[BEST] New best model saved: {model_path} (ep_rew_mean={ep_rew_mean:.2f})"
+                )
 
+        # 기존 logging 코드 유지
         if self.n_calls % self.logging_freq == 0:
+            gc.collect()
             elapsed = time.time() - self.start_time if self.start_time else 0
             progress = (
                 self.num_timesteps / self.model._total_timesteps
