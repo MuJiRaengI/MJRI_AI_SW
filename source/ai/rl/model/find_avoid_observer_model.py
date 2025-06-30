@@ -60,7 +60,7 @@ class ResidualBlock(nn.Module):
         return x + res
 
 
-class FindAvoidObserverExtractor(BaseFeaturesExtractor):
+class FindAvoidObserverExtractorV1(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=256):
         super().__init__(observation_space, features_dim)
         image_shape = observation_space.spaces["image"].shape  # (9, h, w)
@@ -89,7 +89,10 @@ class FindAvoidObserverExtractor(BaseFeaturesExtractor):
             nn.Flatten(),
         )
         self.direct_mlp = nn.Sequential(
-            nn.Linear(in_vector_channels, features_dim),
+            nn.Linear(in_vector_channels, features_dim // 2),
+            nn.ReLU(),
+            nn.Linear(features_dim // 2, features_dim),
+            nn.ReLU(),
         )
 
         self.final = nn.Sequential(
@@ -99,12 +102,65 @@ class FindAvoidObserverExtractor(BaseFeaturesExtractor):
         )
 
     def forward(self, observations):
-        image = observations["image"].float()  # (B, 9, h, w)
+        image = observations["image"].float()  # (B, 3*n, h, w)
+        # img0 = image[0, 0:3, :, :]
         vector = observations["vector"].float()  # (B, 4)
         img_feat = self.conv_scene(image)
         vec_feat = self.direct_mlp(vector)
         concat = th.cat([img_feat, vec_feat], dim=1)
         return self.final(concat)
+
+
+class FindAvoidObserverExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space, features_dim=256):
+        super().__init__(observation_space, features_dim)
+        image_shape = observation_space.spaces["image"].shape  # (9, h, w)
+        vector_shape = observation_space.spaces["vector"].shape  # (4,)
+
+        in_image_channels = image_shape[0]
+        in_vector_channels = vector_shape[0]
+
+        # self.conv_scene = nn.Sequential(
+        #     nn.Conv2d(
+        #         in_image_channels, features_dim, kernel_size=7, padding=3, stride=2
+        #     ),
+        #     nn.BatchNorm2d(features_dim),
+        #     nn.ReLU(True),
+        #     ConvBlock(features_dim, features_dim, kernel_size=3, padding=1, stride=2),
+        #     ConvBlock(features_dim, features_dim, kernel_size=3, padding=1),
+        #     nn.Conv2d(features_dim, features_dim, kernel_size=3, padding=1),
+        #     nn.AdaptiveAvgPool2d(1),
+        #     nn.Flatten(),
+        # )
+        self.direct_mlp = nn.Sequential(
+            nn.Linear(in_vector_channels, features_dim // 2),
+            nn.BatchNorm1d(features_dim // 2),
+            nn.ReLU(),
+            nn.Linear(features_dim // 2, features_dim // 2),
+            nn.BatchNorm1d(features_dim // 2),
+            nn.ReLU(),
+            nn.Linear(features_dim // 2, features_dim // 2),
+            nn.BatchNorm1d(features_dim // 2),
+            nn.ReLU(),
+            nn.Linear(features_dim // 2, features_dim),
+            nn.BatchNorm1d(features_dim),
+            nn.ReLU(),
+        )
+
+        self.final = nn.Sequential(
+            nn.Linear(features_dim, features_dim),
+            nn.ReLU(True),
+            nn.Linear(features_dim, features_dim),
+        )
+
+    def forward(self, observations):
+        # image = observations["image"].float()  # (B, 3*n, h, w)
+        # img0 = image[0, 0:3, :, :]
+        vector = observations["vector"].float()  # (B, 4)
+        # img_feat = self.conv_scene(image)
+        vec_feat = self.direct_mlp(vector)
+        # concat = th.cat([img_feat, vec_feat], dim=1)
+        return self.final(vec_feat)
 
 
 class FindAvoidObserverPolicy(ActorCriticPolicy):

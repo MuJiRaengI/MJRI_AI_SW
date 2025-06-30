@@ -28,6 +28,7 @@ class Breakout(Env):
         self.n_envs = 8
         self.scale = 4
         self.n_stack = 8
+        self.deterministic = False
 
     def key_info(self) -> str:
         return "[조작법] A: 왼쪽, D: 오른쪽, SPACE: FIRE(시작/재시작)\n"
@@ -181,7 +182,7 @@ class Breakout(Env):
             features_extractor_kwargs=dict(features_dim=64),
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_460000_steps.zip"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             model = PPO.load(model_path, env=env, policy=BreakoutResnet, device="cuda")
@@ -282,7 +283,7 @@ class Breakout(Env):
                 last_model_path = None
 
             # 모델 예측
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=self.deterministic)
             obs, reward, done, info = env.step(action)
             frame = env.envs[0].render()
 

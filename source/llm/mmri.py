@@ -7,15 +7,17 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "tts_key.json"
 import re
 import torch
 import datetime
-from collections import deque
 import time
 import threading
+import emoji
+import io
+import simpleaudio as sa
+from collections import deque
 from PIL import Image
 from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 from google.cloud import texttospeech
 from pydub import AudioSegment
 from pydub.playback import play
-import emoji
 
 
 class MJRIBot:
@@ -135,18 +137,23 @@ class MJRIBot:
         return answer
 
     def speech(self, text):
-        print(f"Generating speech for text: {text}")
         synthesis_input = texttospeech.SynthesisInput(text=text)
         response = self.tts.synthesize_speech(
             input=synthesis_input, voice=self.voice, audio_config=self.audio_config
         )
 
-        with open(self.voice_file_name, "wb") as out:
-            out.write(response.audio_content)
+        audio_stream = io.BytesIO(response.audio_content)
+        sound = AudioSegment.from_file(audio_stream, format="wav")
 
-        sound = AudioSegment.from_file(self.voice_file_name, format="wav")
-        play(sound)
-        # playsound(self.voice_file_name)
+        # pydub에서 raw data 추출
+        raw_data = sound.raw_data
+        playback = sa.play_buffer(
+            raw_data,
+            num_channels=sound.channels,
+            bytes_per_sample=sound.sample_width,
+            sample_rate=sound.frame_rate,
+        )
+        playback.wait_done()
 
 
 if __name__ == "__main__":

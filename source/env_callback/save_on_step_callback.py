@@ -23,6 +23,7 @@ class SaveOnStepCallback(BaseCallback):
         log_dir: str = None,
         progress_queue: Queue = None,
         verbose: int = 0,
+        max_best_models: int = 5,  # 최대 저장할 best 모델 개수
     ):
         super().__init__(verbose)
         self.save_freq = save_freq
@@ -31,6 +32,7 @@ class SaveOnStepCallback(BaseCallback):
         self.name_prefix = name_prefix
         self.log_dir = log_dir
         self.max_log_length = 1000
+        self.max_best_models = max_best_models  # 최대 저장할 best 모델 개수
         self.episode_rewards = []
         self.episode_lengths = []
         self.last_print = 0
@@ -49,6 +51,60 @@ class SaveOnStepCallback(BaseCallback):
     def extract_step(self, fname: str) -> int:
         match = re.search(r"_(\d+)_steps\.zip", fname)
         return int(match.group(1)) if match else -1
+
+    def extract_reward(self, fname: str) -> int:
+        """파일명에서 보상 값을 추출 (음수 보상도 포함)"""
+        match = re.search(r"_best_\d+_(-?\d+)\.zip", fname)
+        return int(match.group(1)) if match else None
+
+    def cleanup_old_best_models(self):
+        """가장 성능이 낮은 best 모델들을 삭제하여 최대 개수 유지"""
+        try:
+            # best 모델 파일들 찾기
+            best_files = []
+            for fname in os.listdir(self.save_dir):
+                if fname.startswith(f"{self.name_prefix}_best_") and fname.endswith(
+                    ".zip"
+                ):
+                    reward = self.extract_reward(fname)
+                    if reward is not None:  # None이 아닌 모든 보상 값 포함 (음수 포함)
+                        best_files.append((fname, reward))
+
+            # print(
+            #     f"[CLEANUP] 발견된 best 모델 {len(best_files)}개: {[f'{fname} (reward={reward})' for fname, reward in best_files]}"
+            # )
+
+            # 보상 기준으로 정렬 (높은 순)
+            best_files.sort(key=lambda x: x[1], reverse=True)
+            # print(
+            #     f"[CLEANUP] 정렬 후: {[f'{fname} (reward={reward})' for fname, reward in best_files]}"
+            # )
+
+            # 최대 개수를 초과하는 파일들 삭제
+            if len(best_files) > self.max_best_models:
+                files_to_keep = best_files[: self.max_best_models]
+                files_to_delete = best_files[self.max_best_models :]
+                # print(
+                #     f"[CLEANUP] 유지할 모델 {len(files_to_keep)}개: {[fname for fname, _ in files_to_keep]}"
+                # )
+                # print(
+                #     f"[CLEANUP] 삭제할 모델 {len(files_to_delete)}개: {[fname for fname, _ in files_to_delete]}"
+                # )
+
+                for fname, reward in files_to_delete:
+                    file_path = os.path.join(self.save_dir, fname)
+                    try:
+                        os.remove(file_path)
+                        # print(
+                        #     f"[CLEANUP] 이전 best 모델 삭제: {fname} (reward={reward})"
+                        # )
+                    except Exception as e:
+                        print(f"[ERROR] 파일 삭제 실패 {fname}: {e}")
+            else:
+                pass
+                # print(f"[CLEANUP] 현재 모델 개수 {len(best_files)}개로 정리 불필요")
+        except Exception as e:
+            print(f"[ERROR] best 모델 정리 실패: {e}")
 
     def _on_step(self) -> bool:
         # step마다 reward 누적
@@ -87,6 +143,9 @@ class SaveOnStepCallback(BaseCallback):
                 print(
                     f"[BEST] New best model saved: {model_path} (ep_rew_mean={ep_rew_mean:.2f})"
                 )
+
+                # 이전 best 모델들 정리 (상위 5개만 유지)
+                self.cleanup_old_best_models()
 
         # 기존 logging 코드 유지
         if self.n_calls % self.logging_freq == 0:

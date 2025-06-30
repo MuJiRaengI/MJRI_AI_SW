@@ -19,7 +19,7 @@ class EnvAvoidObserver(gym.Env):
         num_observers=0,
         h=640,
         w=1280,
-        scale_factor=0.5,
+        scale_factor=0.25,
     ):
         super().__init__()
         self.map_size_px = np.array(map_size_px)
@@ -41,12 +41,17 @@ class EnvAvoidObserver(gym.Env):
         self.observer_speed = 2.0
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
 
+        self.frame_stack = 4
+
         obs_dim = 2 + 2 * num_observers
         # observation_space를 Dict로 정의
         self.observation_space = spaces.Dict(
             {
                 "image": spaces.Box(
-                    low=0, high=255, shape=(9, self.h, self.w), dtype=np.uint8
+                    low=0,
+                    high=255,
+                    shape=(3 * self.frame_stack, self.h, self.w),
+                    dtype=np.uint8,
                 ),
                 "vector": spaces.Box(
                     low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
@@ -55,7 +60,7 @@ class EnvAvoidObserver(gym.Env):
         )
         self.action_space = spaces.Discrete(8)
 
-        self.state_buffer = deque(maxlen=3)
+        self.state_buffer = deque(maxlen=self.frame_stack)
 
         self.record = False
         self.video_writer = None

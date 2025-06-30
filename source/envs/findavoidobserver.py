@@ -1,190 +1,327 @@
 import os
-import pygame
-import numpy as np
-import PySide6.QtWidgets as QtWidgets
-from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
-import torch
+import sys
+
+sys.path.append(os.path.abspath("."))
+
+import re
 import time
 import json
-
-from source.ai.rl.model.find_avoid_observer_model import FindAvoidObserverPolicy
+import pygame
+import numpy as np
+from stable_baselines3 import PPO
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
+from source.envs.env import Env
+from source.env_callback.save_on_step_callback import SaveOnStepCallback
+from source.ai.rl.model.find_avoid_observer_model import (
+    FindAvoidObserverExtractor,
+)
 from .env_avoid_observber import EnvAvoidObserver
 
 
-class FindAvoidObserver:
+class FindAvoidObserver(Env):
     def __init__(self):
-        self.env = None
-
-    def reset(self):
-        self.env = EnvAvoidObserver()
-        return self.env.reset()
-
-    def play(self, solution_dir, mode):
-        if self.env is None:
-            self.reset()
-        if mode == "self_play":
-            self._self_play()
-        elif mode == "random_play":
-            self._random_play()
-        elif mode == "train":
-            self._train(solution_dir)
-        elif mode == "test":
-            self._test(solution_dir)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
+        super().__init__()
+        self.env_id = "FindAvoidObserver-v1"
+        self.total_timesteps = 10000000
+        self.save_freq = 1000
+        self.logging_freq = 1000
+        self.feature_dim = 256
+        self.n_envs = 4
+        self.scale = 1  # 스케일링 없음 (이미 적절한 크기)
+        self.deterministic = False
 
     def key_info(self) -> str:
-        return (
-            "[조작법] 방향키: D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\nESC: 종료\n"
-            "키보드로 조작하거나, ESC를 눌러 종료할 수 있습니다."
-        )
+        return "[조작법] D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\n" "ESC: 종료\n"
 
     def _self_play(self):
-        env = self.env
+        env = EnvAvoidObserver()
+        obs = env.reset()
+
+        pygame.init()
+        env.render()  # 초기 렌더링으로 화면 크기 설정
+        pygame.display.set_caption(
+            "FindAvoidObserver Manual Play (D/C/S/Z/A/Q/W/E: Move, ESC: Quit)"
+        )
+        clock = pygame.time.Clock()
+
         running = True
+        action = None
+
         while running:
-            obs = env.reset()
-            done = False
-            action = None
-            env.render()
-            while not done and running:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
+            # 윈도우 종료 처리
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
                         running = False
-                        done = True
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            running = False
-                            done = True
-                        elif event.key == pygame.K_d:
-                            action = 0
-                        elif event.key == pygame.K_c:
-                            action = 1
-                        elif event.key == pygame.K_s:
-                            action = 2
-                        elif event.key == pygame.K_z:
-                            action = 3
-                        elif event.key == pygame.K_a:
-                            action = 4
-                        elif event.key == pygame.K_q:
-                            action = 5
-                        elif event.key == pygame.K_w:
-                            action = 6
-                        elif event.key == pygame.K_e:
-                            action = 7
-                obs, reward, done, _ = env.step(action)
-                env.render()
+
+            # render_queue로부터 stop 신호를 받으면 중단
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 키보드 입력 처리 (pygame 방식)
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_d]:
+                action = 0  # RIGHT
+            elif keys[pygame.K_c]:
+                action = 1  # DOWN_RIGHT
+            elif keys[pygame.K_s]:
+                action = 2  # DOWN
+            elif keys[pygame.K_z]:
+                action = 3  # DOWN_LEFT
+            elif keys[pygame.K_a]:
+                action = 4  # LEFT
+            elif keys[pygame.K_q]:
+                action = 5  # UP_LEFT
+            elif keys[pygame.K_w]:
+                action = 6  # UP
+            elif keys[pygame.K_e]:
+                action = 7  # UP_RIGHT
+
+            # 환경 업데이트
+            obs, reward, done, info = env.step(action)
+            env.render()
+
+            # 에피소드 끝났으면 리셋
+            if done:
+                obs = env.reset()
+
+            clock.tick(self.fps)
+
         env.stop_recording()
         pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
     def _random_play(self):
-        env = self.env
+        env = EnvAvoidObserver()
+        obs = env.reset()
+
+        pygame.init()
+        env.render()
+        pygame.display.set_caption("FindAvoidObserver Random Play (ESC: Quit)")
+        clock = pygame.time.Clock()
+
         running = True
         while running:
-            obs = env.reset()
-            done = False
-            env.render()
-            while not done and running:
-                action = env.action_space.sample()
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
                         running = False
-                        done = True
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            running = False
-                            done = True
-                obs, reward, done, _ = env.step(action)
-                env.render()
+
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 랜덤 액션
+            action = env.action_space.sample()
+            obs, reward, done, info = env.step(action)
+            env.render()
+
+            if done:
+                obs = env.reset()
+
+            clock.tick(self.fps)
+
         env.stop_recording()
         pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
 
-    def _train(self, solution_dir):
-        self.reset()
-        log_dir = os.path.join(solution_dir, "logs")
+    def _train(self):
+        log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, "ppo_find_avoid_observer_train_log.json")
-        save_path = os.path.join(solution_dir, "ppo_find_avoid_observer.zip")
-        model = PPO(FindAvoidObserverPolicy, self.env, verbose=1)
-        total_timesteps = 1000000  # 원하는 학습 스텝 수
-        model.learn(total_timesteps=total_timesteps)
-        model.save(save_path)
 
-        episode_rewards = []
-        episode_lengths = []
-        obs, info = self.env.reset(), {}
-        timestep = 0
-        last_print = 0
-        start_time = time.time()
-        while timestep < total_timesteps:
-            done = False
-            ep_reward = 0
-            ep_length = 0
-            while not done and timestep < total_timesteps:
-                action, _ = model.predict(obs, deterministic=False)
-                step_result = self.env.step(int(action))
-                if len(step_result) == 5:
-                    obs, reward, terminated, truncated, info = step_result
-                    done = terminated or truncated
-                else:
-                    obs, reward, done, info = step_result
-                self.env.render()
-                ep_reward += reward
-                ep_length += 1
-                timestep += 1
-                if timestep % 1000 == 0:
-                    model.save(save_path)
-                    progress = timestep / total_timesteps
-                    elapsed = time.time() - start_time
-                    safe_episode_rewards = [float(r) for r in episode_rewards]
-                    safe_episode_lengths = [int(l) for l in episode_lengths]
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        json.dump(
-                            {
-                                "episode_rewards": safe_episode_rewards,
-                                "episode_lengths": safe_episode_lengths,
-                                "timestep": int(timestep),
-                                "progress": float(progress),
-                                "elapsed_seconds": float(elapsed),
-                            },
-                            f,
-                            ensure_ascii=False,
-                            indent=2,
-                        )
-                    print(f"중간 로그가 저장되었습니다: {log_path}")
-                if timestep - last_print >= 1000:
-                    elapsed = time.time() - start_time
-                    percent = 100 * timestep / total_timesteps
-                    print(
-                        f"[Train] Step: {timestep}/{total_timesteps} | Episodes: {len(episode_rewards)} | Last reward: {ep_reward} | Elapsed: {elapsed:.1f}s | Progress: {percent:.1f}%"
+        # 커스텀 환경 래핑
+        def make_env():
+            return EnvAvoidObserver()
+
+        # 여러 환경으로 병렬 학습
+        env = DummyVecEnv([make_env for _ in range(self.n_envs)])
+
+        # VecMonitor 추가로 episode 통계 수집
+        env = VecMonitor(env)
+
+        # 진행상황 전달
+        if self.training_queue is not None:
+            self.training_queue.put(("total_steps", self.total_timesteps))
+
+        callback = SaveOnStepCallback(
+            save_freq=self.save_freq,
+            logging_freq=self.logging_freq,
+            save_dir=self.save_dir,
+            name_prefix="ppo_find_avoid_observer",
+            log_dir=log_dir,
+            progress_queue=self.training_queue,
+            verbose=1,
+        )
+
+        # 모델 생성 및 학습
+        policy_kwargs = dict(
+            features_extractor_class=FindAvoidObserverExtractor,
+            features_extractor_kwargs=dict(features_dim=self.feature_dim),
+        )
+
+        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Find_op_map_path\logs\ppo_find_avoid_observer_best_44921_3.zip"
+        # if os.path.exists(model_path):
+        #     print(f"기존 모델을 불러옵니다: {model_path}")
+        #     model = PPO.load(model_path, env=env, device="cuda")
+        # else:
+        model = PPO(
+            "MultiInputPolicy",  # Dict observation space 사용
+            env,
+            policy_kwargs=policy_kwargs,
+            device="cuda",
+            verbose=1,
+            n_steps=1024,
+            batch_size=32,
+            n_epochs=10,
+            gamma=0.99,
+            gae_lambda=0.95,
+            ent_coef=0.01,
+            learning_rate=3e-4,
+            clip_range=0.2,
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+        )
+
+        model.learn(total_timesteps=self.total_timesteps, callback=callback)
+
+        # 학습 완료 신호
+        if self.training_queue is not None:
+            self.training_queue.put(("done", None))
+
+        # 모델 저장
+        save_path = os.path.join(self.save_dir, "ppo_find_avoid_observer.zip")
+        tmp_path = save_path.replace("zip", "tmp")
+        model.save(tmp_path)
+        os.replace(tmp_path, save_path)
+        print(f"모델 저장 완료: {save_path}")
+
+    def _test(self):
+        last_model_path = None
+        model = None
+
+        # 커스텀 환경 래핑
+        def make_env():
+            return EnvAvoidObserver()
+
+        env = DummyVecEnv([make_env])
+        obs = env.reset()
+
+        # 초기 렌더링을 위해 단일 환경에 접근
+        single_env = env.envs[0]
+        single_env.render()
+
+        pygame.display.set_caption("FindAvoidObserver Test (ESC: Quit)")
+        clock = pygame.time.Clock()
+
+        # 상태 메시지 폰트 초기화
+        try:
+            font = pygame.font.SysFont("Arial", 24)
+        except:
+            font = None
+
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+
+            if self.render_queue is not None and not self.render_queue.empty():
+                msg = self.render_queue.get()
+                if isinstance(msg, tuple) and msg[0] == "stop":
+                    break
+
+            # 모델 파일 탐색 및 필요시 reload
+            model_path = os.path.join(self.save_dir, "ppo_find_avoid_observer.zip")
+            if not os.path.exists(model_path):
+                max_steps = -1
+                max_steps_path = None
+                for fname in os.listdir(self.save_dir):
+                    match = re.match(
+                        r"ppo_find_avoid_observer_best_(\d+)_\d+\.zip", fname
                     )
-                    last_print = timestep
-            episode_rewards.append(ep_reward)
-            episode_lengths.append(ep_length)
-            obs, info = self.env.reset(), {}
-        model.save(save_path)
-        progress = timestep / total_timesteps
-        elapsed = time.time() - start_time
-        safe_episode_rewards = [float(r) for r in episode_rewards]
-        safe_episode_lengths = [int(l) for l in episode_lengths]
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "episode_rewards": safe_episode_rewards,
-                    "episode_lengths": safe_episode_lengths,
-                    "timestep": int(timestep),
-                    "progress": float(progress),
-                    "elapsed_seconds": float(elapsed),
-                },
-                f,
-                ensure_ascii=False,
-                indent=2,
-            )
-        print(f"모델이 저장되었습니다: {save_path}")
-        print(f"학습 로그가 저장되었습니다: {log_path}")
-        self.env.close()
+                    if match:
+                        steps = int(match.group(1))
+                        if steps > max_steps:
+                            max_steps = steps
+                            max_steps_path = os.path.join(self.save_dir, fname)
+                if max_steps_path:
+                    model_path = max_steps_path
 
-    def _test(self, solution_dir):
-        pass
+            if model_path != last_model_path and os.path.exists(model_path):
+                time.sleep(0.5)  # 잠시 대기 후 모델 로드
+                print(f"모델 업데이트: {model_path}")
+                try:
+                    # env 매개변수와 함께 모델 로드
+                    model = PPO.load(model_path, env=env, device="cuda")
+                    last_model_path = model_path
+                except Exception as e:
+                    print(f"모델 로드 실패: {e}")
+                    model = None
+            elif model is None:
+                print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
+                policy_kwargs = dict(
+                    features_extractor_class=FindAvoidObserverExtractor,
+                    features_extractor_kwargs=dict(features_dim=self.feature_dim),
+                )
+                model = PPO(
+                    "MultiInputPolicy",
+                    env,
+                    policy_kwargs=policy_kwargs,
+                    device="cuda",
+                    verbose=1,
+                )
+                last_model_path = None
+
+            # 모델이 제대로 로드되었을 때만 예측 수행
+            if model is not None:
+                # 모델 예측
+                action, _ = model.predict(obs, deterministic=self.deterministic)
+                obs, reward, done, info = env.step(action)
+                single_env.render()
+
+                if done[0]:
+                    obs = env.reset()
+            else:
+                # 모델이 없으면 대기 (화면은 계속 렌더링)
+                single_env.render()
+
+                # 상태 메시지 표시
+                if font is not None and hasattr(single_env, "screen"):
+                    text_surface = font.render(
+                        "모델 로딩 중... 기다려주세요", True, (255, 255, 0)
+                    )
+                    single_env.screen.blit(text_surface, (10, 50))
+                    pygame.display.flip()
+
+                # 모델 로딩 대기 메시지 표시를 위해 잠시 대기
+                time.sleep(0.5)
+
+            clock.tick(self.fps)
+
+        single_env.stop_recording()
+        pygame.quit()
+        if self.render_queue is not None:
+            self.render_queue.put(("done", None))
+
+
+if __name__ == "__main__":
+    find_avoid_observer = FindAvoidObserver()
+    find_avoid_observer.save_dir = (
+        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Find_op_map_path"
+    )
+    find_avoid_observer.log_dir = "logs"
+    find_avoid_observer._train()
