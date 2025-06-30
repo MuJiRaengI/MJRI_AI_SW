@@ -9,6 +9,7 @@ New_Solution*/
 test.py
 *.zip
 *.json
+*.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

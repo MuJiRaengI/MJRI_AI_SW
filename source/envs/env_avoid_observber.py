@@ -20,6 +20,9 @@ class EnvAvoidObserver(gym.Env):
         h=640,
         w=1280,
         scale_factor=0.25,
+        frame_stack=4,
+        random_start=False,
+        move_observer=False,
     ):
         super().__init__()
         self.map_size_px = np.array(map_size_px)
@@ -27,6 +30,10 @@ class EnvAvoidObserver(gym.Env):
         self.max_steps = max_steps
         self.num_observers = num_observers
         self.scale_factor = scale_factor
+        self.frame_stack = frame_stack
+        self.random_start = random_start
+        self.move_observer = move_observer
+        self._rng = np.random.RandomState(None)  # 인스턴스별 난수 생성기
         self.h = int(h * self.scale_factor)
         self.w = int(w * self.scale_factor)
 
@@ -40,8 +47,6 @@ class EnvAvoidObserver(gym.Env):
         self.agent_speed = 20  # agent is twice observer speed
         self.observer_speed = 2.0
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
-
-        self.frame_stack = 4
 
         obs_dim = 2 + 2 * num_observers
         # observation_space를 Dict로 정의
@@ -125,27 +130,36 @@ class EnvAvoidObserver(gym.Env):
         return False
 
     def reset(self):
+        # if seed is not None:
+        #     self._rng = np.random.RandomState(seed)
+
         self.steps = 0
         self.total_reward = 0.0
         self.reward = 0.0
         self.last_action = None
-        start_tile = np.array([12, 53])
-        self.agent_pos = (start_tile * self.tile_size).astype(np.float32)
+
+        if self.random_start:
+            for _ in range(100):
+                start_tile = self._rng.randint(10, 55, size=2)
+                self.agent_pos = (start_tile * self.tile_size).astype(np.float32)
+                if not self._is_obstacle(self.agent_pos):
+                    break
+        else:
+            start_tile = np.array([12, 53])
+            self.agent_pos = (start_tile * self.tile_size).astype(np.float32)
 
         self.observers = []
         self.observer_targets = []
         self.observer_waits = []
         for _ in range(self.num_observers):
             while True:
-                pos = np.random.randint(0, self.map_size_px[0], size=2).astype(
+                pos = self._rng.randint(0, self.map_size_px[0], size=2).astype(
                     np.float32
                 )
-
                 # 안전지역에 위치하면 다시 위치를 랜덤으로 잡음
                 if not self._is_safe(pos):
                     break
-
-            target = np.random.randint(0, self.map_size_px[0], size=2).astype(
+            target = self._rng.randint(0, self.map_size_px[0], size=2).astype(
                 np.float32
             )
             self.observers.append(pos)
@@ -198,25 +212,26 @@ class EnvAvoidObserver(gym.Env):
         # 위치 갱신
         self.agent_pos = new_pos
 
-        # # 옵저버 이동
-        # for i in range(self.num_observers):
-        #     if self.observer_waits[i] > 0:
-        #         self.observer_waits[i] -= 1
-        #         continue
-        #     obs = self.observers[i]
-        #     tgt = self.observer_targets[i]
-        #     vec = tgt - obs
-        #     dist = np.linalg.norm(vec)
-        #     if dist < self.observer_speed:
-        #         self.observers[i] = tgt
-        #         self.observer_waits[i] = self.observer_pause_frames
-        #         self.observer_targets[i] = np.random.randint(
-        #             0, self.map_size_px[0], size=2
-        #         ).astype(np.float32)
-        #     else:
-        #         direction = vec / dist
-        #         cand = obs + direction * self.observer_speed
-        #         self.observers[i] = np.clip(cand, [0, 0], self.map_size_px - 1)
+        # 옵저버 이동
+        if self.move_observer:
+            for i in range(self.num_observers):
+                if self.observer_waits[i] > 0:
+                    self.observer_waits[i] -= 1
+                    continue
+                obs = self.observers[i]
+                tgt = self.observer_targets[i]
+                vec = tgt - obs
+                dist = np.linalg.norm(vec)
+                if dist < self.observer_speed:
+                    self.observers[i] = tgt
+                    self.observer_waits[i] = self.observer_pause_frames
+                    self.observer_targets[i] = self._rng.randint(
+                        0, self.map_size_px[0], size=2
+                    ).astype(np.float32)
+                else:
+                    direction = vec / dist
+                    cand = obs + direction * self.observer_speed
+                    self.observers[i] = np.clip(cand, [0, 0], self.map_size_px - 1)
 
         # 종료 조건 판별
         done = (
@@ -487,8 +502,33 @@ class EnvAvoidObserver(gym.Env):
 
 
 if __name__ == "__main__":
-    env = EnvAvoidObserver()
-    env.start_recording("test_run.mp4")
+    env = EnvAvoidObserver(num_observers=5, random_start=True, move_observer=True)
+    seed = 1234
+    results = []
+    for i in range(3):
+        obs = env.reset(seed=seed)
+        agent_pos = env.agent_pos.copy()
+        observers = [o.copy() for o in env.observers]
+        observer_targets = [t.copy() for t in env.observer_targets]
+        results.append((agent_pos, observers, observer_targets))
+        print(f"Run {i+1}:")
+        print("  agent_pos:", agent_pos)
+        print("  observers:", observers)
+        print("  observer_targets:", observer_targets)
+        print()
+    # 모든 결과가 동일한지 확인
+    all_same = all(
+        np.allclose(results[0][0], r[0])
+        and all(np.allclose(a, b) for a, b in zip(results[0][1], r[1]))
+        and all(np.allclose(a, b) for a, b in zip(results[0][2], r[2]))
+        for r in results[1:]
+    )
+    print("Seed 고정 결과 동일 여부:", all_same)
+
+    # env.start_recording("test_run.mp4")
+
+    pygame.init()
+    obs = env.reset()
 
     obs = env.reset()
     done = False
