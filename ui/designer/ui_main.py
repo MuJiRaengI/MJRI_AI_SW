@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainSFOqXO.ui'
+## Form generated from reading UI file 'mainkiTkZJ.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -31,6 +31,8 @@ class Ui_main_window(object):
         self.actionUpdate_DB.setObjectName(u"actionUpdate_DB")
         self.actionStop = QAction(main_window)
         self.actionStop.setObjectName(u"actionStop")
+        self.actionthanks = QAction(main_window)
+        self.actionthanks.setObjectName(u"actionthanks")
         self.centralwidget = QWidget(main_window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_2 = QGridLayout(self.centralwidget)
@@ -85,6 +87,8 @@ class Ui_main_window(object):
         self.menuView.setObjectName(u"menuView")
         self.menuHelp = QMenu(self.menubar)
         self.menuHelp.setObjectName(u"menuHelp")
+        self.menuHelp_2 = QMenu(self.menubar)
+        self.menuHelp_2.setObjectName(u"menuHelp_2")
         main_window.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(main_window)
         self.statusbar.setObjectName(u"statusbar")
@@ -94,9 +98,11 @@ class Ui_main_window(object):
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuView.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
+        self.menubar.addAction(self.menuHelp_2.menuAction())
         self.menuHelp.addAction(self.actionUpdate_DB)
         self.menuHelp.addAction(self.actionStart)
         self.menuHelp.addAction(self.actionStop)
+        self.menuHelp_2.addAction(self.actionthanks)
 
         self.retranslateUi(main_window)
 
@@ -111,6 +117,7 @@ class Ui_main_window(object):
         self.actionStart.setText(QCoreApplication.translate("main_window", u"Start LLM", None))
         self.actionUpdate_DB.setText(QCoreApplication.translate("main_window", u"Update DB", None))
         self.actionStop.setText(QCoreApplication.translate("main_window", u"Stop LLM", None))
+        self.actionthanks.setText(QCoreApplication.translate("main_window", u"thanks", None))
         self.btn_new_solution.setText(QCoreApplication.translate("main_window", u"New Solution", None))
         self.btn_open_solution.setText(QCoreApplication.translate("main_window", u"Open Solution", None))
         self.tblw_main.setTabText(self.tblw_main.indexOf(self.tab), QCoreApplication.translate("main_window", u"Home", None))
@@ -118,5 +125,6 @@ class Ui_main_window(object):
         self.menuEdit.setTitle(QCoreApplication.translate("main_window", u"Edit", None))
         self.menuView.setTitle(QCoreApplication.translate("main_window", u"View", None))
         self.menuHelp.setTitle(QCoreApplication.translate("main_window", u"LLM", None))
+        self.menuHelp_2.setTitle(QCoreApplication.translate("main_window", u"info", None))
     # retranslateUi
 

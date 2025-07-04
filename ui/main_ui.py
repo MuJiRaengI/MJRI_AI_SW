@@ -11,6 +11,7 @@ from qt_material import apply_stylesheet
 
 from ui.designer.ui_main import Ui_main_window
 from ui.create_solution_window import CreateSolutionWindow
+from ui.contributors import ContributorsWindow
 from ui.base_tab_wdgt import WdgtBaseTab
 
 from source.solution.solution import Solution
@@ -23,7 +24,18 @@ class MainWindow(QMainWindow, Ui_main_window):
         self.btn_new_solution.clicked.connect(self.slot_create_solution)
         self.btn_open_solution.clicked.connect(self.slot_open_solution)
 
+        self.actionthanks.triggered.connect(self.show_contributors)
+
         self.create_solution_window = CreateSolutionWindow()
+        self.contributors = ContributorsWindow()
+
+    def show_contributors(self):
+        """Contributors 창을 띄웁니다."""
+        if not self.contributors.isVisible():
+            self.contributors.show()
+        else:
+            self.contributors.raise_()
+            self.contributors.activateWindow()
 
     def find_tab_by_solution_path(self, solution):
         """solution의 전체 경로와 일치하는 탭이 있으면 인덱스를 반환, 없으면 -1 반환"""

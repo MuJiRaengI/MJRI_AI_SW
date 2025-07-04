@@ -13,9 +13,13 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from torchvision import models
 from tqdm import tqdm
+import numpy as np
+from PIL import Image
+import torch
 
 from source.ai.rl.model.resnet import Resnet18
 from source.envs.env_avoid_observber import EnvAvoidObserver
+from source.ai.rl.model.find_avoid_observer_model import AutoEncoder
 from torch.utils.data import Dataset, Subset
 
 
@@ -46,42 +50,11 @@ class CustomImageDataset(Dataset):
             self.env.step(action)
         stacks = self.transform(self.env.get_stacked_state())
         inputs = stacks[:12]
-        labels = stacks[12:]
-        return inputs, labels
-
-
-# 간단한 오토인코더 모델 정의
-class AutoEncoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.encoder = models.resnet18(weights=None)
-        self.encoder.conv1 = nn.Conv2d(
-            12, 64, kernel_size=7, stride=2, padding=3, bias=False
-        )
-        self.encoder = nn.Sequential(*list(self.encoder.children())[:-2])
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(512, 256, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 64, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 7, stride=2, padding=3, output_padding=1),
-        )
-
-    def forward(self, x):
-        feat = self.encoder(x)
-        out = self.decoder(feat)
-        return out, feat
+        # labels = stacks[12:]
+        return inputs, stacks
 
 
 def train():
-    ae = AutoEncoder()
-    ae(torch.randn(1, 12, 256, 256))  # 예시 입력
-
     train_dataset = CustomImageDataset(length=1000)
     val_dataset = CustomImageDataset(length=100, fixed_seed=42)
 
@@ -91,9 +64,15 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoEncoder().to(device)
     optimizer = optim.AdamW(model.parameters(), lr=1e-4)
-    criterion = nn.L1Loss()
+    # criterion = nn.L1Loss()
+    criterion = nn.MSELoss()
 
-    epochs = 100
+    save_dir = os.path.join(os.path.abspath("."), "results_ae")
+    print(f"Saving results to: {save_dir}")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+
+    epochs = 500
     best_val_loss = float("inf")
     best_epoch = -1
 
@@ -114,6 +93,7 @@ def train():
         # Validation
         model.eval()
         val_loss = 0
+        first_saved = False
         with torch.no_grad():
             for x, y in tqdm(val_loader, desc=f"Valid Epoch {epoch+1}/{epochs}"):
                 x = x.to(device)
@@ -121,6 +101,24 @@ def train():
                 x_hat, _ = model(x)
                 loss = criterion(x_hat, y)
                 val_loss += loss.item() * x.size(0)
+                # 첫 번째 배치의 첫 번째 샘플을 이미지로 저장
+                if not first_saved:
+                    pred_npy = tensor_to_npy(torch.clip(x_hat[0], 0, 1).unsqueeze(0))
+                    label_npy = tensor_to_npy(torch.clip(y[0], 0, 1).unsqueeze(0))
+                    for i in range(pred_npy.shape[2] // 3):
+                        pred_img = Image.fromarray(pred_npy[:, :, i * 3 : (i + 1) * 3])
+                        pred_img.save(
+                            os.path.join(save_dir, f"pred_epoch_{epoch+1}_{i}.png")
+                        )
+
+                        if epoch == 0:
+                            label_img = Image.fromarray(
+                                label_npy[:, :, i * 3 : (i + 1) * 3]
+                            )
+                            label_img.save(
+                                os.path.join(save_dir, f"label_epoch_{epoch+1}_{i}.png")
+                            )
+                    first_saved = True
         avg_val_loss = val_loss / len(val_loader.dataset)
 
         print(
@@ -143,6 +141,59 @@ def train():
     )
 
 
+def eval():
+    test_dataset = CustomImageDataset(length=100, fixed_seed=None)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AutoEncoder().to(device)
+
+    model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
+    # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
+    model.load_state_dict(torch.load(model_path, map_location=device))
+
+    # test
+    model.eval()
+    with torch.no_grad():
+        for x, y in tqdm(test_loader, desc=f"test"):
+            x = x.to(device)
+            y = y.to(device)
+            pred, _ = model(x)
+            pp = torch.clip(pred[0], 0, 1)
+            yy = y[0]
+
+            print()
+
+
+def tensor_to_image(tensor):
+    """
+    4D tensor (B, C, H, W) → PIL.Image (첫 번째 배치만)
+    """
+    if tensor.is_cuda:
+        tensor = tensor.cpu()
+    img = tensor[0].detach().numpy()  # (3, H, W)
+    img = np.transpose(img, (1, 2, 0))  # (H, W, 3)
+    img = np.clip(img, 0, 1)  # 값이 0~1 범위라면
+    img = (img * 255).astype(np.uint8)
+    return Image.fromarray(img)
+
+
+def tensor_to_npy(tensor):
+    """
+    4D tensor (B, C, H, W) → PIL.Image (첫 번째 배치만)
+    """
+    if tensor.is_cuda:
+        tensor = tensor.cpu()
+    img = tensor[0].detach().numpy()  # (3, H, W)
+    img = np.transpose(img, (1, 2, 0))  # (H, W, 3)
+    img = np.clip(img, 0, 1)  # 값이 0~1 범위라면
+    img = (img * 255).astype(np.uint8)
+    return img
+
+
 if __name__ == "__main__":
     train()
     pygame.quit()
+    # eval()
+
+    # autoencoder 학습 후에 reset() 메서드 수정

@@ -111,10 +111,17 @@
     <addaction name="actionStart"/>
     <addaction name="actionStop"/>
    </widget>
+   <widget class="QMenu" name="menuHelp_2">
+    <property name="title">
+     <string>info</string>
+    </property>
+    <addaction name="actionthanks"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
    <addaction name="menuHelp"/>
+   <addaction name="menuHelp_2"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionStart">
@@ -130,6 +137,11 @@
   <action name="actionStop">
    <property name="text">
     <string>Stop LLM</string>
+   </property>
+  </action>
+  <action name="actionthanks">
+   <property name="text">
+    <string>thanks</string>
    </property>
   </action>
  </widget>

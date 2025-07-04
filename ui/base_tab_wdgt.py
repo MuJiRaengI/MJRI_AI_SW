@@ -92,6 +92,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self.btn_test.clicked.connect(lambda: self.slot_btn_env_play("test"))
         self.cbox_target_window.wheelEvent = lambda event: None
         self.cbox_select_game.wheelEvent = lambda event: None
+
         self.update()
 
     def update_select_game_list(self):
@@ -202,6 +203,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self.pbar_state.setMinimum(0)
             self.pbar_state.setMaximum(0)
             self.pbar_state.setValue(0)
+            # run_train(env_class, solution_dir, self._training_queue)
             self._train_process = multiprocessing.Process(
                 target=run_train,
                 args=(env_class, solution_dir, self._training_queue),

@@ -45,7 +45,7 @@ class EnvAvoidObserver(gym.Env):
 
         # Speeds
         self.agent_speed = 20  # agent is twice observer speed
-        self.observer_speed = 2.0
+        self.observer_speed = 10.0
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
 
         obs_dim = 2 + 2 * num_observers
@@ -129,9 +129,9 @@ class EnvAvoidObserver(gym.Env):
             return self.goal_mask[y, x] == 1
         return False
 
-    def reset(self):
-        # if seed is not None:
-        #     self._rng = np.random.RandomState(seed)
+    def reset(self, *args, **kwargs):
+        if kwargs["seed"] is not None:
+            self._rng = np.random.RandomState(kwargs["seed"])
 
         self.steps = 0
         self.total_reward = 0.0
