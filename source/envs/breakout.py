@@ -33,7 +33,7 @@ class Breakout(Env):
     def key_info(self) -> str:
         return "[조작법] A: 왼쪽, D: 오른쪽, SPACE: FIRE(시작/재시작)\n"
 
-    def _self_play(self):
+    def _self_play(self, *args, **kwargs):
         env = gym.make(self.env_id, render_mode="rgb_array")
         env.metadata["render_fps"] = self.fps
         obs, info = env.reset()
@@ -103,7 +103,7 @@ class Breakout(Env):
         if self.render_queue is not None:
             self.render_queue.put(("done", None))
 
-    def _random_play(self):
+    def _random_play(self, *args, **kwargs):
         env = gym.make(self.env_id, render_mode="rgb_array")
         env.metadata["render_fps"] = self.fps
         obs, info = env.reset()
@@ -153,7 +153,7 @@ class Breakout(Env):
         if self.render_queue is not None:
             self.render_queue.put(("done", None))
 
-    def _train(self):
+    def _train(self, *args, **kwargs):
         log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
@@ -217,7 +217,7 @@ class Breakout(Env):
         os.replace(tmp_path, save_path)
         print(f"모델 저장 완료: {save_path}")
 
-    def _test(self):
+    def _test(self, *args, **kwargs):
         last_model_path = None
         model = None
         # 학습과 동일하게 VecFrameStack 적용

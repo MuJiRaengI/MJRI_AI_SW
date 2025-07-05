@@ -72,7 +72,7 @@ def train():
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    epochs = 500
+    epochs = 2000
     best_val_loss = float("inf")
     best_epoch = -1
 
@@ -129,13 +129,17 @@ def train():
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             best_epoch = epoch + 1
-            torch.save(model.state_dict(), "autoencoder_best.pth")
+            # torch.save(model.state_dict(), "autoencoder_best.pth")
+            model_path = os.path.join(save_dir, "autoencoder_best.pth")
+            torch.save(model.state_dict(), model_path)
             print(
                 f"[Best] Model saved at epoch {epoch+1} (Val Loss: {avg_val_loss:.6f})"
             )
 
     # 마지막 모델도 저장
-    torch.save(model.state_dict(), "autoencoder_last.pth")
+    # torch.save(model.state_dict(), "autoencoder_last.pth")
+    model_path = os.path.join(save_dir, "autoencoder_last.pth")
+    torch.save(model.state_dict(), model_path)
     print(
         f"Autoencoder 학습 완료! Best epoch: {best_epoch}, Best Val Loss: {best_val_loss:.6f}"
     )

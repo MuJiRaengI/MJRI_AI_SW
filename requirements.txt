@@ -24,3 +24,4 @@ google-cloud-texttospeech
 pydub 
 emoji
 simpleaudio
+mss

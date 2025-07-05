@@ -32,7 +32,7 @@ class FindAvoidObserver(Env):
     def key_info(self) -> str:
         return "[조작법] D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\n" "ESC: 종료\n"
 
-    def _self_play(self):
+    def _self_play(self, *args, **kwargs):
         env = EnvAvoidObserver()
         obs = env.reset()
 
@@ -95,7 +95,7 @@ class FindAvoidObserver(Env):
         if self.render_queue is not None:
             self.render_queue.put(("done", None))
 
-    def _random_play(self):
+    def _random_play(self, *args, **kwargs):
         env = EnvAvoidObserver()
         obs = env.reset()
 
@@ -133,7 +133,7 @@ class FindAvoidObserver(Env):
         if self.render_queue is not None:
             self.render_queue.put(("done", None))
 
-    def _train(self):
+    def _train(self, *args, **kwargs):
         log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
@@ -204,7 +204,7 @@ class FindAvoidObserver(Env):
         os.replace(tmp_path, save_path)
         print(f"모델 저장 완료: {save_path}")
 
-    def _test(self):
+    def _test(self, *args, **kwargs):
         last_model_path = None
         model = None
 

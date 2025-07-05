@@ -130,7 +130,7 @@ class EnvAvoidObserver(gym.Env):
         return False
 
     def reset(self, *args, **kwargs):
-        if kwargs["seed"] is not None:
+        if kwargs.get("seed") is not None:
             self._rng = np.random.RandomState(kwargs["seed"])
 
         self.steps = 0
