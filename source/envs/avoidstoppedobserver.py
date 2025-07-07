@@ -362,7 +362,7 @@ class AvoidStoppedObserver(Env):
 
 
 if __name__ == "__main__":
-    find_avoid_observer = FindAvoidObserver()
+    find_avoid_observer = AvoidStoppedObserver()
     find_avoid_observer.save_dir = (
         r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Find_op_map_path"
     )

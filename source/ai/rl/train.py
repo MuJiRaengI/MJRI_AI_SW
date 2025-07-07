@@ -35,18 +35,24 @@ class Trainer:
 if __name__ == "__main__":
     import gym
     import pygame
-    from stable_baselines3 import DQN, PPO
+    from stable_baselines3 import PPO
+    from BBF_agent.BBF import BBF
+    from model.breakout_bbf import BBF_Model
 
     pygame.init()
     pygame.display.set_caption(
         "Breakout Controller (A: Left, D: Right, 아무키도X: 정지)"
     )
 
-    # env = gym.make("ALE/Breakout-v5", render_mode="human")
-    env = gym.make("CartPole-v1", render_mode="human")
+    env = gym.make("ALE/Breakout-v5", render_mode="human")
+    n_actions = env.action_space.n
+    # env = gym.make("CartPole-v1", render_mode="human")
 
     # 예시로 사용할 에이전트와 환경
-    agent = PPO("MlpPolicy", env, verbose=1, device="cpu")
+    # agent = PPO("MlpPolicy", env, verbose=1, device="cpu")
+
+    model = BBF_Model(n_actions).cuda()
+    agent = BBF(model, env)
 
     trainer = Trainer(agent, env, episodes=10000)
     trainer.train()
