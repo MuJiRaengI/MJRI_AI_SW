@@ -21,7 +21,7 @@ import wandb
 class BBF:
     def __init__(self, model, env, learning_rate=1e-4, batch_size=32,
                  ema_decay=0.995, initial_gamma=0.97, final_gamma=0.997,
-                 initial_n=10, final_n=3, num_buckets=51, reset_freq=40000, replay_ratio=2, weight_decay=0.1, input_size=(96, 72)):
+                 initial_n=10, final_n=3, num_buckets=51, reset_freq=40000, replay_ratio=2, weight_decay=0.1):
         self.model = model
         self.model_target = copy.deepcopy(model)
         self.env = env
@@ -40,6 +40,12 @@ class BBF:
         self.weight_decay = weight_decay
         self.transforms = transforms.Compose([transforms.Resize((96,72))])
 
+    def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf"):
+        wandb.init(
+            project="BBF-Test",
+            name=f"BBF",
+        )
+
         perception_modules=[self.model.encoder_cnn, self.model.transition]
         actor_modules=[self.model.prediction, self.model.projection, self.model.a, self.model.v]
 
@@ -57,12 +63,6 @@ class BBF:
 
         self.optimizer = torch.optim.AdamW(chain(params_wm, params_ac),
                                     lr=self.learning_rate, weight_decay=self.weight_decay, eps=1.5e-4)
-
-    def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf"):
-        wandb.init(
-            project="BBF-Test",
-            name=f"BBF",
-        )
 
         self.memory = PrioritizedReplay_nSteps_Sqrt(total_timesteps+5)
         self.memory.free()
@@ -169,10 +169,10 @@ class BBF:
                             params_wm.append(param)
                     
                     optimizer_aux = torch.optim.AdamW(params_wm, lr=self.learning_rate, weight_decay=self.weight_decay, eps=1.5e-4)
-                    copy_states(optimizer, optimizer_aux)
-                    optimizer = torch.optim.AdamW(chain(params_wm, params_ac),
+                    copy_states(self.optimizer, optimizer_aux)
+                    self.optimizer = torch.optim.AdamW(chain(params_wm, params_ac),
                                         lr=self.learning_rate, weight_decay=self.weight_decay, eps=1.5e-4)
-                    copy_states(optimizer_aux, optimizer)
+                    copy_states(optimizer_aux, self.optimizer)
                 
                 step+=1
                 

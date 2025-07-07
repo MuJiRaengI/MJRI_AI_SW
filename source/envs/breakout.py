@@ -237,8 +237,31 @@ class Breakout(Env):
         # 모델 생성 및 학습
         # model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
 
-        model = BBF_Model(n_actions).cuda()
-        agent = BBF(model, env)
+        model = BBF_Model(
+            n_actions, # env action space size
+            hiddens=2048, # representation dim
+            scale_width=4,  # cnn channel scale
+            num_buckets=51,  # buckets in distributional RL
+            Vmin=-10,  # min value in distributional RL
+            Vmax=10, # max value in distributional RL
+            resize=(96, 72) # input resize
+        ).cuda()
+
+        agent = BBF(
+            model,
+            env,
+            learning_rate=1e-4,
+            batch_size=32,
+            ema_decay=0.995, # target model ema decay
+            initial_gamma=0.97, # starting gamma
+            final_gamma=0.997, # final gamma
+            initial_n=10, # starting n-step
+            final_n=3, # final n-step
+            num_buckets=51, # buckets in distributional RL
+            reset_freq=40000, # reset schedule in grad step
+            replay_ratio=2, # update number in one step
+            weight_decay=0.1 # weight decay in optimizer
+        )
 
         model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
         if os.path.exists(model_path):
@@ -417,6 +440,7 @@ class Breakout(Env):
                 last_model_path = ""
 
             # 모델 예측
+            # model input : [batch, frameStack, channel, height, width]
             action = model.predict(torch.cat(list(states),-3).unsqueeze(0))  # 마지막 4개 Frame 입력
             obs, reward, done, trunc, info = env.step(action.cpu().numpy())
             done = done or trunc
