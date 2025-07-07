@@ -4,9 +4,30 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
 from .resnet import Resnet18
+from .unet import UNet
 from torchvision import models
 import torch
 import gym
+
+
+class DoubleResnet18(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+
+        # game_scene
+        self.resnet_scene = Resnet18(in_channels, out_channels)
+
+        # minimap
+        self.resnet_minimap = Resnet18(in_channels, out_channels)
+
+        # concat
+        self.mix = nn.Linear(out_channels * 2, out_channels)
+
+    def forward(self, scene, minimap):
+        scene = self.resnet_scene(scene)
+        minimap = self.resnet_minimap(minimap)
+        x = self.mix(torch.concat([scene, minimap], dim=1))
+        return x
 
 
 class ConvBlock(nn.Module):
@@ -70,7 +91,9 @@ class ResidualMLP(nn.Module):
 
         self.fc1 = nn.Linear(in_features, hidden_features)
         self.bn1 = nn.BatchNorm1d(hidden_features)
-        self.act = nn.ReLU(inplace=True)
+        # self.act = nn.ReLU(inplace=True)
+        # self.act = nn.LeakyReLU(inplace=True)
+        self.act = nn.GELU()
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.bn2 = nn.BatchNorm1d(out_features)
 
@@ -219,12 +242,14 @@ class AvoidStoppedObserverExtractor(BaseFeaturesExtractor):
     def forward(self, observations):
         with torch.no_grad():
             img = observations["image"].float()
+            # print("image max:", img.max(), "min:", img.min())
             img_feat = self.resnet(img)
         img_feat = self.conv2mlp(img_feat)
 
-        # with torch.no_grad():
-        vector = observations["vector"].float()
-        vec_feat = self.direct_mlp(vector)
+        with torch.no_grad():
+            vector = observations["vector"].float()
+            vec_feat = self.direct_mlp(vector)
+            vec_feat = vec_feat * 0
 
         feat = th.cat([img_feat, vec_feat], dim=1)
         return self.final(feat)

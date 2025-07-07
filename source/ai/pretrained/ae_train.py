@@ -63,6 +63,12 @@ def train():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoEncoder().to(device)
+    model.load_state_dict(
+        torch.load(
+            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results_ae_1\autoencoder_best.pth",
+            map_location=device,
+        )
+    )
     optimizer = optim.AdamW(model.parameters(), lr=1e-4)
     # criterion = nn.L1Loss()
     criterion = nn.MSELoss()

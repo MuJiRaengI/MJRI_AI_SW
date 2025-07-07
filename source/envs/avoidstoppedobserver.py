@@ -32,6 +32,7 @@ class AvoidStoppedObserver(Env):
         self.deterministic = False
 
         self.max_step_length = 1000
+        self.num_observers = 500
 
     def key_info(self) -> str:
         return "[조작법] D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\n" "ESC: 종료\n"
@@ -39,7 +40,7 @@ class AvoidStoppedObserver(Env):
     def _self_play(self, *args, **kwargs):
         env = EnvAvoidObserver(
             max_steps=self.max_step_length,
-            num_observers=50,
+            num_observers=self.num_observers,
             random_start=False,
             move_observer=True,
         )
@@ -107,7 +108,7 @@ class AvoidStoppedObserver(Env):
     def _random_play(self, *args, **kwargs):
         env = EnvAvoidObserver(
             max_steps=self.max_step_length,
-            num_observers=50,
+            num_observers=self.num_observers,
             random_start=False,
             move_observer=True,
         )
@@ -156,7 +157,7 @@ class AvoidStoppedObserver(Env):
         def make_env():
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
-                num_observers=50,
+                num_observers=self.num_observers,
                 random_start=True,
                 move_observer=True,
             )
@@ -187,10 +188,7 @@ class AvoidStoppedObserver(Env):
             features_extractor_kwargs=dict(features_dim=self.feature_dim),
         )
 
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\direct_mlp.zip"
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\pretrained2.zip"
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\pretrained3.zip"
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\pretrained4.zip"
+        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\pretrained1.zip"
         model_path = r""
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
@@ -215,8 +213,8 @@ class AvoidStoppedObserver(Env):
             )
 
         # pretrained AE
-        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
-        pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
+        pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
+        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
         pretrained_ae = torch.load(pretrained_ae_path, map_location="cuda")
 
         new_state_dict = OrderedDict()
@@ -252,16 +250,18 @@ class AvoidStoppedObserver(Env):
         def make_env():
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
-                num_observers=50,
-                random_start=False,
+                num_observers=self.num_observers,
+                random_start=True,
                 move_observer=True,
             )
 
-        env = DummyVecEnv([make_env])
+        # env = DummyVecEnv([make_env])
+        env = make_env()
         obs = env.reset()
 
         # 초기 렌더링을 위해 단일 환경에 접근
-        single_env = env.envs[0]
+        # single_env = env.envs[0]
+        single_env = env
         single_env.render()
 
         pygame.display.set_caption("FindAvoidObserver Test (ESC: Quit)")
@@ -294,7 +294,7 @@ class AvoidStoppedObserver(Env):
                 max_steps_path = None
                 for fname in os.listdir(self.save_dir):
                     match = re.match(
-                        r"ppo_find_avoid_observer_best_(\d+)_\d+\.zip", fname
+                        r"ppo_find_avoid_observer_best_(\d+)_(-?\d+)\.zip", fname
                     )
                     if match:
                         steps = int(match.group(1))
@@ -331,10 +331,24 @@ class AvoidStoppedObserver(Env):
 
             # 모델이 제대로 로드되었을 때만 예측 수행
             if model is not None:
-                # 모델 예측
-                action, _ = model.predict(obs, deterministic=self.deterministic)
-                obs, reward, done, info = env.step(action)
-                single_env.render()
+                # # 모델 예측
+                # action, _ = model.predict(obs, deterministic=self.deterministic)
+                # obs, reward, done, info = env.step(action)
+                model.policy.eval()
+                with torch.no_grad():
+                    obs_tensor, _ = model.policy.obs_to_tensor(obs)
+                    features = model.policy.extract_features(obs_tensor)
+                    latent_pi, _ = model.policy.mlp_extractor(features)
+                    distribution = model.policy._get_action_dist_from_latent(latent_pi)
+                    logits = distribution.distribution.logits  # Categorical일 때
+                    # print("logits:", torch.softmax(logits, dim=1))
+                action = distribution.get_actions()
+                obs, reward, done, info = env.step(action.item())
+                done = [done]
+
+                single_env.render(
+                    logits=torch.softmax(logits, dim=1).detach().cpu().numpy().round(3)
+                )
 
                 if done[0]:
                     obs = env.reset()

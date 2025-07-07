@@ -9,6 +9,7 @@ import cv2
 import torch.nn.functional as F
 import os
 import time
+import threading
 
 from source.utils.mjri_screen import MJRIScreen
 from source.utils.mjri_keyboard import MJRIKeyboard
@@ -25,6 +26,7 @@ class EnvStarcraft(gym.Env):
 
         self.focus_num = 1
         self.focus_thread = None
+        self.focus_flag = False
 
         self.keyboard = MJRIKeyboard()
         self.mouse = MJRIMouse()
@@ -42,16 +44,29 @@ class EnvStarcraft(gym.Env):
             raise ValueError(
                 "Screen position not set. Use set_screen_pos() before reset()."
             )
+        self.mouse.leftClick(self.x + 30, self.y + 30, delay=0.1)
 
         self.mouse.drag(
-            self.x + 10,
-            self.y + 10,
+            self.x + 30,
+            self.y + 30,
             self.x + 1100,
             self.y + 600,
         )
         self.keyboard.set_numbering(self.focus_num)
 
-    # def start_focusing(self):
+    def start_focusing(self):
+        self.focus_thread = threading.Thread(
+            target=self.focus_numbering_auto, args=(self.focus_num,)
+        )
+        self.focus_thread.start()
+
+    def focus_numbering_auto(self, number):
+        self.focus_flag = True
+        while self.focus_flag:
+            self.keyboard.focus_numbering(str(number))
+
+    def stop_focusing(self):
+        self.focus_flag = False
 
     def set_screen_pos(self, x: int, y: int, w: int, h: int):
         """화면의 특정 영역을 설정합니다."""
@@ -92,6 +107,44 @@ class EnvStarcraft(gym.Env):
 
     def render(self, mode="human"):
         pass
+
+    def crop_game_screen(self, scene):
+        return scene[35:650, 3:-3]
+
+    def crop_minimap(self, scene):
+        return scene[720:-3, 3:280]
+
+    def crop_now_unit_info(self, scene):
+        return scene[780:, 280:810]
+
+    def split_map(self, screen):
+        game_screen = self.crop_game_screen(screen)
+        minimap = self.crop_minimap(screen)
+        unit_info = self.crop_now_unit_info(screen)
+        return game_screen, minimap, unit_info
+
+    def transform_direction(self, game_scene, minimap, downsample=3):
+        game_scene = torch.from_numpy(game_scene).permute(2, 0, 1).float()
+        game_scene = game_scene / 255.0
+        minimap = torch.from_numpy(minimap).permute(2, 0, 1).float()
+        minimap = minimap / 255.0
+
+        if downsample > 1:
+            height, width = game_scene.shape[1:]
+            new_size = (height // downsample, width // downsample)
+            game_scene = torch.nn.functional.interpolate(
+                game_scene.unsqueeze(0),
+                size=new_size,
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(0)
+
+        return game_scene.unsqueeze(0), minimap.unsqueeze(0)
+
+    def transform_detection(self, scene):
+        scene = torch.from_numpy(scene).permute(2, 0, 1).float()
+        scene = scene / 255.0
+        return scene.unsqueeze(0)
 
 
 if __name__ == "__main__":

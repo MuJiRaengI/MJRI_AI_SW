@@ -136,6 +136,7 @@ class EnvAvoidObserver(gym.Env):
         self.steps = 0
         self.total_reward = 0.0
         self.reward = 0.0
+        self.logits = None
         self.last_action = None
 
         if self.random_start:
@@ -171,10 +172,12 @@ class EnvAvoidObserver(gym.Env):
 
         return self._get_obs()
 
-    def step(self, action: int):
+    def step(self, action: int, logits=None):
         self.last_action = action
         if not hasattr(self, "total_reward"):
             self.total_reward = 0.0
+
+        self.logits = logits
 
         direction = np.array([0, 0])
         if action is not None:
@@ -257,22 +260,40 @@ class EnvAvoidObserver(gym.Env):
         elif self._is_obstacle(pos) or self._check_collision():
             return -1.0
 
-        reward = -0.05
+        reward = 0.05
+        # reward = -0.05
+        #
+        # direction = np.array(self.get_direction_one_hot()).argmax()
+        # # 0 : 오른쪽
+        # # 1 : 오른쪽 아래
+        # # 2 : 아래
+        # # 3 : 왼쪽 아래
+        # # 4 : 왼쪽
+        # # 5 : 왼쪽 위
+        # # 6 : 위
+        # # 7 : 오른쪽 위
+        # if direction == 0:  # right
+        #     if action in [0, 1, 7]:
+        #         reward = 0.05
+        #     elif action in [2, 6]:
+        #         reward = 0.0
+        # elif direction == 1:  # down
+        #     if action in [1, 2, 3]:
+        #         reward = 0.05
+        #     elif action in [0, 4]:
+        #         reward = 0.0
+        # elif direction == 2:  # left
+        #     if action in [3, 4, 5]:
+        #         reward = 0.05
+        #     elif action in [2, 6]:
+        #         reward = 0.0
+        # elif direction == 3:  # up
+        #     if action in [5, 6, 7]:
+        #         reward = 0.05
+        #     elif action in [0, 4]:
+        #         reward = 0.0
 
-        direction = np.array(self.get_direction_one_hot()).argmax()
-        if direction == 0:  # right
-            if action in [0, 1, 7]:
-                reward = 0.05
-        elif direction == 1:  # down
-            if action in [1, 2, 3]:
-                reward = 0.05
-        elif direction == 2:  # left
-            if action in [3, 4, 5]:
-                reward = 0.05
-        elif direction == 3:  # up
-            if action in [5, 6, 7]:
-                reward = 0.05
-
+        # # ======= 거리 기반 보상 계산 ========
         # # 현재 에이전트 좌표
         # x, y = pos.astype(int)
         # # 크롭할 영역 계산
@@ -431,7 +452,7 @@ class EnvAvoidObserver(gym.Env):
         else:
             return [0, 0, 0, 0]  # unknown or river
 
-    def render(self, mode="human"):
+    def render(self, mode="human", logits=None):
         try:
             sw, sh = self.camera_size_px
             if not hasattr(self, "screen"):
@@ -456,11 +477,14 @@ class EnvAvoidObserver(gym.Env):
             pygame.draw.circle(self.screen, (255, 0, 0), (ax, ay), 16)
 
             font = pygame.font.SysFont("Arial", 20)
+            if logits is None:
+                logits = "None"
             lines = [
                 f"Step: {self.steps}",
                 f"Score: {getattr(self, 'total_reward', 0):.3f}",
                 f"Reward: {getattr(self, 'reward', 0):.3f}",
                 f"Action: {getattr(self, 'last_action', 'None')}",
+                f"logits: {logits}",
             ]
 
             for i, line in enumerate(lines):
