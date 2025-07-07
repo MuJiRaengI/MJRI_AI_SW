@@ -260,7 +260,7 @@ class Breakout(Env):
             num_buckets=51, # buckets in distributional RL
             reset_freq=40000, # reset schedule in grad step
             replay_ratio=2, # update number in one step
-            weight_decay=0.1 # weight decay in optimizer
+            weight_decay=0.1 # weight decay in optimizer,
         )
 
         model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
@@ -272,7 +272,9 @@ class Breakout(Env):
             total_timesteps=self.total_timesteps,
             save_freq=self.save_freq,
             save_path=self.save_dir,
-            name_prefix="bbf_breakout"
+            name_prefix="bbf_breakout", # save file name prefix
+            project_name="Breakout",  # wandb project name
+            exp_name="BBF" # wandb experience name
         )
 
         # 학습 완료 신호

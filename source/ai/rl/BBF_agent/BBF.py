@@ -40,7 +40,7 @@ class BBF:
         self.weight_decay = weight_decay
         self.transforms = transforms.Compose([transforms.Resize((96,72))])
 
-    def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf"):
+    def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf", project_name="BBF-Test", exp_name="BBF"):
         wandb.init(
             project="BBF-Test",
             name=f"BBF",
