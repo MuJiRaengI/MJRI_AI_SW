@@ -11,8 +11,6 @@ Transition = namedtuple('Transition',
 eps=1e-10
 _eps = torch.tensor(eps, device='cuda')
 
-
-
 class RandomShiftsAug(nn.Module):
     def __init__(self, pad):
         super().__init__()
@@ -56,20 +54,12 @@ class RandomShiftsAug(nn.Module):
 
 crop_aug = RandomShiftsAug(pad=4)
 
-
-
 def preprocess_replay(x):
     batch, seq, cnn_shape = x.shape[0], x.shape[1], x.shape[-3:]
     x = crop_aug(x.view(-1, *cnn_shape)).view(batch, seq, *cnn_shape)
 
     noise = 1 + (0.05*torch.randn_like(x).clip(-2.0,2.0))
     return x * noise
-
-
-
-
-
-
 
 class PrioritizedReplay_nSteps_Sqrt(object):
     def __init__(self, capacity, final_beta=1.0, initial_beta=0.4, total_steps=40000, prefetch_cap=8, alpha=0.5, beta=0.5):

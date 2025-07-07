@@ -36,10 +36,10 @@ class DQN_Conv(nn.Module):
         _hiddens = in_hiddens
         for l in range(layers):
             modules.append(nn.Conv2d(_hiddens, hiddens, ks, stride, padding, bias=bias))
+            modules.append(nn.BatchNorm2d(hiddens, eps=1e-6) if norm else nn.Identity())
+            modules.append(act)
             if l == layers-1:
                 modules.append(nn.MaxPool2d(3,2,padding=1) if max_pool else nn.Identity())
-                modules.append(nn.BatchNorm2d(hiddens, eps=1e-6) if norm else nn.Identity())
-                modules.append(act)
             _hiddens = hiddens
 
         self.conv = nn.Sequential(*modules)

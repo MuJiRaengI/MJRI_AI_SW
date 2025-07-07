@@ -42,8 +42,8 @@ class BBF:
 
     def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf", project_name="BBF-Test", exp_name="BBF"):
         wandb.init(
-            project="BBF-Test",
-            name=f"BBF",
+            project=project_name,
+            name=exp_name,
         )
 
         perception_modules=[self.model.encoder_cnn, self.model.transition]
@@ -191,7 +191,7 @@ class BBF:
                     for i in range(4):
                         states.append(state)
 
-            save_checkpoint(self.model, self.model_target, save_path)
+            save_checkpoint(self.model, self.model_target, f"{save_path}/{name_prefix}.pth")
         
 
     def optimize(self, grad_step, n):
