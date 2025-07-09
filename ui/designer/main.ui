@@ -108,8 +108,8 @@
      <string>LLM</string>
     </property>
     <addaction name="actionUpdate_DB"/>
-    <addaction name="actionStart"/>
-    <addaction name="actionStop"/>
+    <addaction name="actionLLMStart"/>
+    <addaction name="actionLLMStop"/>
    </widget>
    <widget class="QMenu" name="menuHelp_2">
     <property name="title">
@@ -124,7 +124,7 @@
    <addaction name="menuHelp_2"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionStart">
+  <action name="actionLLMStart">
    <property name="text">
     <string>Start LLM</string>
    </property>
@@ -134,7 +134,7 @@
     <string>Update DB</string>
    </property>
   </action>
-  <action name="actionStop">
+  <action name="actionLLMStop">
    <property name="text">
     <string>Stop LLM</string>
    </property>

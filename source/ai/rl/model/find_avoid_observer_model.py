@@ -204,7 +204,7 @@ class AvoidStoppedObserverExtractor(BaseFeaturesExtractor):
 
         self.resnet = models.resnet18(weights=None)
         out_feature = self.resnet.conv1.out_channels
-        in_features = self.resnet.fc.in_features
+        in_features = 512 * 4 * 4
         self.resnet.conv1 = nn.Conv2d(
             in_image_channels,
             out_feature,
@@ -218,7 +218,7 @@ class AvoidStoppedObserverExtractor(BaseFeaturesExtractor):
         )
 
         self.conv2mlp = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
+            # nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
             nn.Linear(in_features, features_dim),
         )

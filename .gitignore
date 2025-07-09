@@ -4,6 +4,8 @@ Find_op_map_path/
 New_Solution*/
 pretrained/
 AvoidStoppedObserver/
+tts_examples/
+Starcraft_avoid_observer/
 *.png
 *.jpg
 *.jpeg

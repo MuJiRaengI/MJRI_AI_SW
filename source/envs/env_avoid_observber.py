@@ -37,6 +37,8 @@ class EnvAvoidObserver(gym.Env):
         self.h = int(h * self.scale_factor)
         self.w = int(w * self.scale_factor)
 
+        self.x_crop, self.y_crop, self.w_crop, self.h_crop = 400, 100, 512, 512
+
         self.camera_size_tiles = (20, 10)
         self.camera_size_px = (
             self.camera_size_tiles[0] * tile_size,
@@ -52,10 +54,20 @@ class EnvAvoidObserver(gym.Env):
         # observation_space를 Dict로 정의
         self.observation_space = spaces.Dict(
             {
+                # "image": spaces.Box(
+                #     low=0,
+                #     high=255,
+                #     shape=(3 * self.frame_stack, self.h, self.w),
+                #     dtype=np.uint8,
+                # ),
                 "image": spaces.Box(
                     low=0,
                     high=255,
-                    shape=(3 * self.frame_stack, self.h, self.w),
+                    shape=(
+                        3 * self.frame_stack,
+                        int(self.h_crop * scale_factor),
+                        int(self.w_crop * scale_factor),
+                    ),
                     dtype=np.uint8,
                 ),
                 "vector": spaces.Box(
@@ -136,7 +148,6 @@ class EnvAvoidObserver(gym.Env):
         self.steps = 0
         self.total_reward = 0.0
         self.reward = 0.0
-        self.logits = None
         self.last_action = None
 
         if self.random_start:
@@ -172,12 +183,10 @@ class EnvAvoidObserver(gym.Env):
 
         return self._get_obs()
 
-    def step(self, action: int, logits=None):
+    def step(self, action: int):
         self.last_action = action
         if not hasattr(self, "total_reward"):
             self.total_reward = 0.0
-
-        self.logits = logits
 
         direction = np.array([0, 0])
         if action is not None:
@@ -258,9 +267,9 @@ class EnvAvoidObserver(gym.Env):
         if self._is_goal(pos):
             return 1.0
         elif self._is_obstacle(pos) or self._check_collision():
-            return -1.0
+            return -5.0
 
-        reward = 0.05
+        reward = 0.5
         # reward = -0.05
         #
         # direction = np.array(self.get_direction_one_hot()).argmax()
@@ -423,6 +432,12 @@ class EnvAvoidObserver(gym.Env):
         scene = torch.from_numpy(
             np.concatenate([obs_mask, observer_mask, agent_mask], axis=0)
         )
+
+        scene = scene[
+            :,
+            self.y_crop : self.y_crop + self.h_crop,
+            self.x_crop : self.x_crop + self.w_crop,
+        ]
 
         return scene * 255
 

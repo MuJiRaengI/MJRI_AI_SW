@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainkiTkZJ.ui'
+## Form generated from reading UI file 'maintYFjCu.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -25,12 +25,12 @@ class Ui_main_window(object):
         if not main_window.objectName():
             main_window.setObjectName(u"main_window")
         main_window.resize(718, 483)
-        self.actionStart = QAction(main_window)
-        self.actionStart.setObjectName(u"actionStart")
+        self.actionLLMStart = QAction(main_window)
+        self.actionLLMStart.setObjectName(u"actionLLMStart")
         self.actionUpdate_DB = QAction(main_window)
         self.actionUpdate_DB.setObjectName(u"actionUpdate_DB")
-        self.actionStop = QAction(main_window)
-        self.actionStop.setObjectName(u"actionStop")
+        self.actionLLMStop = QAction(main_window)
+        self.actionLLMStop.setObjectName(u"actionLLMStop")
         self.actionthanks = QAction(main_window)
         self.actionthanks.setObjectName(u"actionthanks")
         self.centralwidget = QWidget(main_window)
@@ -100,8 +100,8 @@ class Ui_main_window(object):
         self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuHelp_2.menuAction())
         self.menuHelp.addAction(self.actionUpdate_DB)
-        self.menuHelp.addAction(self.actionStart)
-        self.menuHelp.addAction(self.actionStop)
+        self.menuHelp.addAction(self.actionLLMStart)
+        self.menuHelp.addAction(self.actionLLMStop)
         self.menuHelp_2.addAction(self.actionthanks)
 
         self.retranslateUi(main_window)
@@ -114,9 +114,9 @@ class Ui_main_window(object):
 
     def retranslateUi(self, main_window):
         main_window.setWindowTitle(QCoreApplication.translate("main_window", u"MJRI AI Software", None))
-        self.actionStart.setText(QCoreApplication.translate("main_window", u"Start LLM", None))
+        self.actionLLMStart.setText(QCoreApplication.translate("main_window", u"Start LLM", None))
         self.actionUpdate_DB.setText(QCoreApplication.translate("main_window", u"Update DB", None))
-        self.actionStop.setText(QCoreApplication.translate("main_window", u"Stop LLM", None))
+        self.actionLLMStop.setText(QCoreApplication.translate("main_window", u"Stop LLM", None))
         self.actionthanks.setText(QCoreApplication.translate("main_window", u"thanks", None))
         self.btn_new_solution.setText(QCoreApplication.translate("main_window", u"New Solution", None))
         self.btn_open_solution.setText(QCoreApplication.translate("main_window", u"Open Solution", None))

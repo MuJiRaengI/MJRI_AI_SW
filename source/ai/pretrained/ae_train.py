@@ -26,7 +26,7 @@ from torch.utils.data import Dataset, Subset
 class CustomImageDataset(Dataset):
     def __init__(self, length, fixed_seed=None):
         self.env = EnvAvoidObserver(
-            num_observers=100, random_start=True, move_observer=True, frame_stack=5
+            num_observers=500, random_start=True, move_observer=True, frame_stack=5
         )
         self.length = length
         self.fixed_seed = fixed_seed
@@ -65,7 +65,7 @@ def train():
     model = AutoEncoder().to(device)
     model.load_state_dict(
         torch.load(
-            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results_ae_1\autoencoder_best.pth",
+            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results_ae_full_size\autoencoder_best.pth",
             map_location=device,
         )
     )
@@ -78,7 +78,7 @@ def train():
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    epochs = 2000
+    epochs = 1000
     best_val_loss = float("inf")
     best_epoch = -1
 
@@ -109,12 +109,21 @@ def train():
                 val_loss += loss.item() * x.size(0)
                 # 첫 번째 배치의 첫 번째 샘플을 이미지로 저장
                 if not first_saved:
+                    diff_npy = torch.abs(x_hat[0].detach().cpu() - y[0].detach().cpu())
+                    diff_npy = (
+                        torch.clip(diff_npy, 0, 1).permute(1, 2, 0).numpy() * 255
+                    ).astype(np.uint8)
                     pred_npy = tensor_to_npy(torch.clip(x_hat[0], 0, 1).unsqueeze(0))
                     label_npy = tensor_to_npy(torch.clip(y[0], 0, 1).unsqueeze(0))
                     for i in range(pred_npy.shape[2] // 3):
                         pred_img = Image.fromarray(pred_npy[:, :, i * 3 : (i + 1) * 3])
                         pred_img.save(
                             os.path.join(save_dir, f"pred_epoch_{epoch+1}_{i}.png")
+                        )
+                        # save diff image
+                        diff_img = Image.fromarray(diff_npy[:, :, i * 3 : (i + 1) * 3])
+                        diff_img.save(
+                            os.path.join(save_dir, f"diff_epoch_{epoch+1}_{i}.png")
                         )
 
                         if epoch == 0:
@@ -158,7 +167,9 @@ def eval():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoEncoder().to(device)
 
-    model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
+    model_path = (
+        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results_ae\autoencoder_best.pth"
+    )
     # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
     model.load_state_dict(torch.load(model_path, map_location=device))
 
@@ -168,10 +179,33 @@ def eval():
         for x, y in tqdm(test_loader, desc=f"test"):
             x = x.to(device)
             y = y.to(device)
-            pred, _ = model(x)
-            pp = torch.clip(pred[0], 0, 1)
-            yy = y[0]
 
+            pred, _ = model(x)
+            # pp = torch.clip(pred[0], 0, 1)
+            # yy = y[0]
+            pred_npy = tensor_to_npy(torch.clip(pred[0], 0, 1).unsqueeze(0))
+            label_npy = tensor_to_npy(torch.clip(y[0], 0, 1).unsqueeze(0))
+            diff_npy = np.abs(pred_npy - label_npy)
+
+            for i in range(pred_npy.shape[2] // 3):
+                pred_img = Image.fromarray(pred_npy[:, :, i * 3 : (i + 1) * 3])
+                pred_img.save(
+                    os.path.join(
+                        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW", f"pred_{i}.png"
+                    )
+                )
+                label_img = Image.fromarray(label_npy[:, :, i * 3 : (i + 1) * 3])
+                label_img.save(
+                    os.path.join(
+                        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW", f"label_{i}.png"
+                    )
+                )
+                diff_img = Image.fromarray(diff_npy[:, :, i * 3 : (i + 1) * 3])
+                diff_img.save(
+                    os.path.join(
+                        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW", f"diff_{i}.png"
+                    )
+                )
             print()
 
 
