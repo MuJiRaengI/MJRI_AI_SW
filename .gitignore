@@ -6,6 +6,7 @@ pretrained/
 AvoidStoppedObserver/
 tts_examples/
 Starcraft_avoid_observer/
+llm_log/
 *.png
 *.jpg
 *.jpeg
