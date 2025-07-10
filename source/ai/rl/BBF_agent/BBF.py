@@ -21,7 +21,9 @@ import wandb
 class BBF:
     def __init__(self, model, env, learning_rate=1e-4, batch_size=32,
                  ema_decay=0.995, initial_gamma=0.97, final_gamma=0.997,
-                 initial_n=10, final_n=3, num_buckets=51, reset_freq=40000, replay_ratio=2, weight_decay=0.1):
+                 initial_n=10, final_n=3, num_buckets=51, reset_freq=40000,
+                 replay_ratio=2, weight_decay=0.1, gym_env=False, stackFrame=True):
+
         self.model = model
         self.model_target = copy.deepcopy(model)
         self.env = env
@@ -39,6 +41,8 @@ class BBF:
         self.replay_ratio = replay_ratio
         self.weight_decay = weight_decay
         self.transforms = transforms.Compose([transforms.Resize((96,72))])
+        self.gym_env = gym_env
+        self.stackFrame = stackFrame
 
     def learn(self, total_timesteps, save_freq=None, save_path=None, name_prefix="bbf", project_name="BBF-Test", exp_name="BBF"):
         wandb.init(
@@ -74,12 +78,16 @@ class BBF:
         progress_bar = tqdm.tqdm(total=total_timesteps)
 
         while step<(10):
-            state, info = self.env.reset()
+            if self.gym_env:
+                state = self.env.reset()
+            else:
+                state, info = self.env.reset()
             state = self.model.preprocess(state).unsqueeze(0)
 
-            states = deque(maxlen=4)
-            for i in range(4):
-                states.append(state)
+            if self.stackFrame:
+                states = deque(maxlen=4)
+                for i in range(4):
+                    states.append(state)
             
             
             eps_reward=torch.tensor([0], dtype=torch.float)
@@ -102,17 +110,30 @@ class BBF:
                 #if resetted[0]>0:
                 #    states = env.noop_steps(states)
                     
-                Q_action = self.model_target.env_step(torch.cat(list(states),-3).unsqueeze(0))
+                if self.stackFrame:
+                    Q_action = self.model_target.env_step(torch.cat(list(states),-3).unsqueeze(0))
+                else:
+                    Q_action = self.model_target.env_step(state.unsqueeze(0))
                 
                 action = epsilon_greedy(Q_action, self.n_actions, len_memory).cpu()
                 
-                self.memory.push(torch.cat(list(states),-3).detach().cpu(), torch.tensor(reward,dtype=torch.float), action,
-                            torch.tensor(np.logical_or(done_flag, life_loss),dtype=torch.bool))
+                if self.stackFrame:
+                    self.memory.push(torch.cat(list(states),-3).detach().cpu(), torch.tensor(reward,dtype=torch.float), action,
+                                torch.tensor(np.logical_or(done_flag, life_loss),dtype=torch.bool))
+                else:
+                    self.memory.push(state.detach().cpu(), torch.tensor(reward,dtype=torch.float), action,
+                                torch.tensor(np.logical_or(done_flag, life_loss),dtype=torch.bool))
                 # print('action', action, action.shape)
 
-                state, reward, terminated, truncated, info = self.env.step(action.numpy())
+                if self.gym_env:
+                    state, reward, terminated, info = self.env.step(action.item())
+                    truncated = False
+                else:
+                    state, reward, terminated, truncated, info = self.env.step(action.item())
+
                 state = self.model.preprocess(state).unsqueeze(0)
-                states.append(state)
+                if self.stackFrame:
+                    states.append(state)
                 reward = np.array([reward])
                 terminated = np.array([terminated])
                 truncated = np.array([truncated])
@@ -122,10 +143,11 @@ class BBF:
 
                 
                 done_flag = np.logical_or(terminated, truncated)
-                lives = np.array([info['lives']])
-                life_loss = np.clip(last_lives-lives, 0, None)
-                resetted = np.clip(lives-last_lives, 0, None)
-                last_lives = lives
+                if "lives" in info:
+                    lives = np.array([info['lives']])
+                    life_loss = np.clip(last_lives-lives, 0, None)
+                    resetted = np.clip(lives-last_lives, 0, None)
+                    last_lives = lives
 
                 
                 n = int(self.initial_n * (self.final_n/self.initial_n)**(min(grad_step,self.schedule_max_step) / self.schedule_max_step))
@@ -184,12 +206,16 @@ class BBF:
                         scores.append(eps_reward[log].clone())
 
                     eps_reward[log_t]=0
-                    state, info = self.env.reset()
+                    if self.gym_env:
+                        state = self.env.reset()
+                    else:
+                        state, info = self.env.reset()
                     state = self.model.preprocess(state).unsqueeze(0)
 
-                    states = deque(maxlen=4)
-                    for i in range(4):
-                        states.append(state)
+                    if self.stackFrame:
+                        states = deque(maxlen=4)
+                        for i in range(4):
+                            states.append(state)
 
             save_checkpoint(self.model, self.model_target, f"{save_path}/{name_prefix}.pth")
         

@@ -258,20 +258,23 @@ class EnvAvoidObserver(gym.Env):
             return -1.0
 
         reward = -0.05
-
         direction = np.array(self.get_direction_one_hot()).argmax()
-        if direction == 0:  # right
-            if action in [0, 1, 7]:
-                reward = 0.05
-        elif direction == 1:  # down
-            if action in [1, 2, 3]:
-                reward = 0.05
-        elif direction == 2:  # left
-            if action in [3, 4, 5]:
-                reward = 0.05
-        elif direction == 3:  # up
-            if action in [5, 6, 7]:
-                reward = 0.05
+
+        degree = [np.pi/4 * i for i in range(8)]
+        reward = np.cos(degree[direction*2] - degree[action]) * 0.1 - 0.01
+
+        # if direction == 0:  # right
+        #     if action in [0, 1, 7]:
+        #         reward = 0.05
+        # elif direction == 1:  # down
+        #     if action in [1, 2, 3]:
+        #         reward = 0.05
+        # elif direction == 2:  # left
+        #     if action in [3, 4, 5]:
+        #         reward = 0.05
+        # elif direction == 3:  # up
+        #     if action in [5, 6, 7]:
+        #         reward = 0.05
 
         # # 현재 에이전트 좌표
         # x, y = pos.astype(int)

@@ -28,7 +28,7 @@ class Breakout(Env):
         # self.total_timesteps = 50000000
         self.total_timesteps = 100000
         # self.save_freq = 5000
-        self.save_freq = 1000
+        self.save_freq = 10000
         self.logging_freq = 1000
         self.n_envs = 8
         self.scale = 4
@@ -266,7 +266,7 @@ class Breakout(Env):
         model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
-            model = agent.load(model_path)
+            agent.load(model_path)
 
         agent.learn(
             total_timesteps=self.total_timesteps,

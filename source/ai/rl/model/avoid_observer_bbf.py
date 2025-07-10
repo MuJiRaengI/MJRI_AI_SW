@@ -64,14 +64,14 @@ class BBF_Model(nn.Module):
         
         # self.encoder_cnn = IMPALA_Resnet(scale_width=scale_width, norm=False, init=init_xavier, act=self.act)
         self.encoder_cnn = nn.Sequential(
-            DQN_Conv(12, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=2),
+            DQN_Conv(16, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=1),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=False, act=self.act, layers=2)
         )
     
         # Single layer dense that maps the flattened encoded representation into hiddens.
-        self.projection = MLP(13824, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        self.projection = MLP(12800, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
         self.prediction = MLP(hiddens, out_hiddens=hiddens, layers=1)
                                               
         self.transition = nn.Sequential(DQN_Conv(32*scale_width+n_actions, 32*scale_width, 3, 1, 1, norm=False, act=self.act),
@@ -99,8 +99,21 @@ class BBF_Model(nn.Module):
         return ((tensor - min_value) / (max_value - min_value + 1e-5)).view(shape)
 
     def preprocess(self, state):
-        state=torch.tensor(state, dtype=torch.float, device='cuda') / 255
-        state=self.transforms(state.permute(2,0,1))
+        image = torch.tensor(state["image"], dtype=torch.float).cuda() / 255
+        _, height, width = image.shape
+        start, end = width//2-height//2, width//2+height//2
+        image = image[:, :, start:end] # image crop
+
+        vector = torch.tensor(state["vector"], dtype=torch.float).cuda()
+        vector = vector.view(-1, 1, 1).expand(-1, *image.shape[-2:]) # vector to image channel
+
+        state = torch.cat((image, vector), 0)
+        state = self.transforms(state)
+
+        # # image check
+        # a = state[:3]
+        # a = a.permute(1, 2, 0)
+
         return state
     
     def env_step(self, X):
