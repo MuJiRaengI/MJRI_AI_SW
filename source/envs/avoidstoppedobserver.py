@@ -273,7 +273,7 @@ class AvoidStoppedObserver(Env):
             scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=10, # max value in distributional RL
+            Vmax=18, # max value in distributional RL
             resize=(80, 80) # input resize
         ).cuda()
 
@@ -291,7 +291,7 @@ class AvoidStoppedObserver(Env):
             reset_freq=40000, # reset schedule in grad step
             replay_ratio=2, # update number in one step
             weight_decay=0.1, # weight decay in optimizer,
-            epsilon=0.01,
+            epsilon=0.005,
             gym_env=True,
             stackFrame=False
         )
