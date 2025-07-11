@@ -64,17 +64,14 @@ class BBF_Model(nn.Module):
         
         # self.encoder_cnn = IMPALA_Resnet(scale_width=scale_width, norm=False, init=init_xavier, act=self.act)
         self.encoder_cnn = nn.Sequential(
-            DQN_Conv(12, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=1),
+            DQN_Conv(16, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=1),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=False, act=self.act, layers=2)
         )
-
-        self.direction_encoder = nn.Linear(4, 400)
     
         # Single layer dense that maps the flattened encoded representation into hiddens.
-        self.projection = MLP(12800+400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
-        self.trans_projection = MLP(12800, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        self.projection = MLP(12800, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
         self.prediction = MLP(hiddens, out_hiddens=hiddens, layers=1)
                                               
         self.transition = nn.Sequential(DQN_Conv(32*scale_width+n_actions, 32*scale_width, 3, 1, 1, norm=False, act=self.act),
@@ -130,21 +127,14 @@ class BBF_Model(nn.Module):
         return self.env_step(X)[0][0]
 
     def encode(self, X):
-        X, vector = X[:, :, :12], X[:, :, 12:]
         batch, seq = X.shape[:2]
         self.batch = batch
         self.seq = seq
-
         X = self.encoder_cnn(X.contiguous().view(self.batch*self.seq, *(X.shape[2:]))).contiguous()
         X = self.renormalize(X).contiguous().view(self.batch, self.seq, *X.shape[-3:])
         X = X.contiguous().view(self.batch, self.seq, *X.shape[-3:])
         z = X.clone()
         X = X.flatten(-3,-1)
-
-        vector = vector[:, :, :, 0, 0].view(self.batch, self.seq, 4)
-        vector = self.direction_encoder(vector)
-
-        X = torch.cat((X, vector), 2)
         X = self.projection(X)
         return X, z
 
@@ -171,7 +161,7 @@ class BBF_Model(nn.Module):
         
         z_pred = torch.stack(z_preds,1)
 
-        z_pred = self.trans_projection(z_pred.flatten(-3,-1)).view(self.batch,5,-1)
+        z_pred = self.projection(z_pred.flatten(-3,-1)).view(self.batch,5,-1)
         z_pred = self.prediction(z_pred)
         
         return z_pred

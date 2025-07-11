@@ -16,9 +16,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from source.envs.env import Env
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
 from source.ai.rl.model.find_avoid_observer_model import AvoidStoppedObserverExtractor
-from env_avoid_observber import EnvAvoidObserver
+from .env_avoid_observber import EnvAvoidObserver
 from source.ai.rl.BBF_agent.BBF import BBF
-from source.ai.rl.model.avoid_observer_bbf import BBF_Model
+from source.ai.rl.model.avoid_observer_bbf_simple import BBF_Model
 
 
 class AvoidStoppedObserver(Env):
@@ -272,7 +272,7 @@ class AvoidStoppedObserver(Env):
             hiddens=2048, # representation dim
             scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
-            Vmin=-10,  # min value in distributional RL
+            Vmin=-2,  # min value in distributional RL
             Vmax=10, # max value in distributional RL
             resize=(80, 80) # input resize
         ).cuda()
@@ -288,17 +288,18 @@ class AvoidStoppedObserver(Env):
             initial_n=10, # starting n-step
             final_n=3, # final n-step
             num_buckets=51, # buckets in distributional RL
-            reset_freq=50000, # reset schedule in grad step
+            reset_freq=40000, # reset schedule in grad step
             replay_ratio=2, # update number in one step
             weight_decay=0.1, # weight decay in optimizer,
+            epsilon=0.01,
             gym_env=True,
             stackFrame=False
         )
 
-        model_path = r"C:\Users\onlyb\Documents\RL project\MJRI_AI_SW\avoid_observer\bbf_avoid_observer_base.pth"
-        if os.path.exists(model_path):
-            print(f"기존 모델을 불러옵니다: {model_path}")
-            agent.load(model_path)
+        # model_path = r""
+        # if os.path.exists(model_path):
+        #     print(f"기존 모델을 불러옵니다: {model_path}")
+        #     agent.load(model_path)
 
         agent.learn(
             total_timesteps=self.total_timesteps,
@@ -317,6 +318,8 @@ class AvoidStoppedObserver(Env):
         save_path = os.path.join(self.save_dir, "bbf_avoid_observer.pth")
         agent.save(save_path)
         print(f"모델 저장 완료: {save_path}")
+        # os.system("powercfg -h off")
+        # os.system("rundll32.exe powrprof.dll SetSuspendState")
 
     def _test(self, *args, **kwargs):
         last_model_path = None

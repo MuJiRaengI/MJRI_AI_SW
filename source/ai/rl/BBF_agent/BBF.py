@@ -22,7 +22,7 @@ class BBF:
     def __init__(self, model, env, learning_rate=1e-4, batch_size=32,
                  ema_decay=0.995, initial_gamma=0.97, final_gamma=0.997,
                  initial_n=10, final_n=3, num_buckets=51, reset_freq=40000,
-                 replay_ratio=2, weight_decay=0.1, gym_env=False, stackFrame=True):
+                 replay_ratio=2, weight_decay=0.1, epsilon=0, gym_env=False, stackFrame=True):
 
         self.model = model
         self.model_target = copy.deepcopy(model)
@@ -40,6 +40,7 @@ class BBF:
         self.schedule_max_step = reset_freq//4
         self.replay_ratio = replay_ratio
         self.weight_decay = weight_decay
+        self.epsilon = epsilon
         self.transforms = transforms.Compose([transforms.Resize((96,72))])
         self.gym_env = gym_env
         self.stackFrame = stackFrame
@@ -115,7 +116,7 @@ class BBF:
                 else:
                     Q_action = self.model_target.env_step(state.unsqueeze(0))
                 
-                action = epsilon_greedy(Q_action, self.n_actions, len_memory).cpu()
+                action = epsilon_greedy(Q_action, self.n_actions, len_memory, self.epsilon).cpu()
                 
                 if self.stackFrame:
                     self.memory.push(torch.cat(list(states),-3).detach().cpu(), torch.tensor(reward,dtype=torch.float), action,
