@@ -44,8 +44,8 @@ class EnvAvoidObserver(gym.Env):
         )
 
         # Speeds
-        self.agent_speed = 40  # agent is twice observer speed
-        self.observer_speed = 20.0
+        self.agent_speed = 10  # agent is twice observer speed
+        self.observer_speed = 5.0
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
 
         obs_dim = 2 + 2 * num_observers
