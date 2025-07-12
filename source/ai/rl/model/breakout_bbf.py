@@ -64,7 +64,7 @@ class BBF_Model(nn.Module):
         
         # self.encoder_cnn = IMPALA_Resnet(scale_width=scale_width, norm=False, init=init_xavier, act=self.act)
         self.encoder_cnn = nn.Sequential(
-            DQN_Conv(12, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=2),
+            DQN_Conv(12, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=1),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=False, act=self.act, layers=2)

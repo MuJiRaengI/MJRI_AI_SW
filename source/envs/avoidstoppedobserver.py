@@ -18,14 +18,14 @@ from source.env_callback.save_on_step_callback import SaveOnStepCallback
 from source.ai.rl.model.find_avoid_observer_model import AvoidStoppedObserverExtractor
 from .env_avoid_observber import EnvAvoidObserver
 from source.ai.rl.BBF_agent.BBF import BBF
-from source.ai.rl.model.avoid_observer_bbf_simple import BBF_Model
+from source.ai.rl.model.avoid_observer_bbf import BBF_Model
 
 
 class AvoidStoppedObserver(Env):
     def __init__(self):
         super().__init__()
         self.env_id = "FindAvoidObserver-v1"
-        self.total_timesteps = 200000
+        self.total_timesteps = 100000
         self.save_freq = 10000
         self.logging_freq = 1000
         self.feature_dim = 256
@@ -273,7 +273,7 @@ class AvoidStoppedObserver(Env):
             scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=18, # max value in distributional RL
+            Vmax=10, # max value in distributional RL
             resize=(80, 80) # input resize
         ).cuda()
 
@@ -291,7 +291,7 @@ class AvoidStoppedObserver(Env):
             reset_freq=40000, # reset schedule in grad step
             replay_ratio=2, # update number in one step
             weight_decay=0.1, # weight decay in optimizer,
-            epsilon=0.005,
+            epsilon=0,
             gym_env=True,
             stackFrame=False
         )
@@ -318,8 +318,8 @@ class AvoidStoppedObserver(Env):
         save_path = os.path.join(self.save_dir, "bbf_avoid_observer.pth")
         agent.save(save_path)
         print(f"모델 저장 완료: {save_path}")
-        # os.system("powercfg -h off")
-        # os.system("rundll32.exe powrprof.dll SetSuspendState")
+        os.system("powercfg -h off")
+        os.system("rundll32.exe powrprof.dll SetSuspendState")
 
     def _test(self, *args, **kwargs):
         last_model_path = None

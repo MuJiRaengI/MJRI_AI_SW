@@ -257,11 +257,11 @@ class EnvAvoidObserver(gym.Env):
         elif self._is_obstacle(pos) or self._check_collision():
             return -0.3
 
-        reward = -0.05
+        # reward = -0.05
         direction = np.array(self.get_direction_one_hot()).argmax()
 
         degree = [np.pi/4 * i for i in range(8)]
-        reward = np.cos(degree[direction*2] - degree[action]) * 0.05 - 0.005
+        reward = np.cos(degree[direction*2] - degree[action]) * 0.1 - 0.01
 
         # if direction == 0:  # right
         #     if action in [0, 1, 7]:
