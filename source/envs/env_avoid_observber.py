@@ -37,6 +37,8 @@ class EnvAvoidObserver(gym.Env):
         self.h = int(h * self.scale_factor)
         self.w = int(w * self.scale_factor)
 
+        self.x_crop, self.y_crop, self.w_crop, self.h_crop = 400, 100, 512, 512
+
         self.camera_size_tiles = (20, 10)
         self.camera_size_px = (
             self.camera_size_tiles[0] * tile_size,
@@ -52,10 +54,20 @@ class EnvAvoidObserver(gym.Env):
         # observation_space를 Dict로 정의
         self.observation_space = spaces.Dict(
             {
+                # "image": spaces.Box(
+                #     low=0,
+                #     high=255,
+                #     shape=(3 * self.frame_stack, self.h, self.w),
+                #     dtype=np.uint8,
+                # ),
                 "image": spaces.Box(
                     low=0,
                     high=255,
-                    shape=(3 * self.frame_stack, self.h, self.w),
+                    shape=(
+                        3 * self.frame_stack,
+                        int(self.h_crop * scale_factor),
+                        int(self.w_crop * scale_factor),
+                    ),
                     dtype=np.uint8,
                 ),
                 "vector": spaces.Box(
@@ -255,7 +267,8 @@ class EnvAvoidObserver(gym.Env):
         if self._is_goal(pos):
             return 1.0
         elif self._is_obstacle(pos) or self._check_collision():
-            return -0.3
+            # return -0.3
+            return -5.0
 
         reward = -0.05
         direction = np.array(self.get_direction_one_hot()).argmax()
@@ -263,19 +276,39 @@ class EnvAvoidObserver(gym.Env):
         degree = [np.pi/4 * i for i in range(8)]
         reward = np.cos(degree[direction*2] - degree[action]) * 0.05 - 0.005
 
+        # reward = -0.05
+        #
+        # direction = np.array(self.get_direction_one_hot()).argmax()
+        # # 0 : 오른쪽
+        # # 1 : 오른쪽 아래
+        # # 2 : 아래
+        # # 3 : 왼쪽 아래
+        # # 4 : 왼쪽
+        # # 5 : 왼쪽 위
+        # # 6 : 위
+        # # 7 : 오른쪽 위
         # if direction == 0:  # right
         #     if action in [0, 1, 7]:
         #         reward = 0.05
+        #     elif action in [2, 6]:
+        #         reward = 0.0
         # elif direction == 1:  # down
         #     if action in [1, 2, 3]:
         #         reward = 0.05
+        #     elif action in [0, 4]:
+        #         reward = 0.0
         # elif direction == 2:  # left
         #     if action in [3, 4, 5]:
         #         reward = 0.05
+        #     elif action in [2, 6]:
+        #         reward = 0.0
         # elif direction == 3:  # up
         #     if action in [5, 6, 7]:
         #         reward = 0.05
+        #     elif action in [0, 4]:
+        #         reward = 0.0
 
+        # # ======= 거리 기반 보상 계산 ========
         # # 현재 에이전트 좌표
         # x, y = pos.astype(int)
         # # 크롭할 영역 계산
@@ -406,6 +439,12 @@ class EnvAvoidObserver(gym.Env):
             np.concatenate([obs_mask, observer_mask, agent_mask], axis=0)
         )
 
+        scene = scene[
+            :,
+            self.y_crop : self.y_crop + self.h_crop,
+            self.x_crop : self.x_crop + self.w_crop,
+        ]
+
         return scene * 255
 
     def get_direction_one_hot(self, pos=None):
@@ -434,7 +473,7 @@ class EnvAvoidObserver(gym.Env):
         else:
             return [0, 0, 0, 0]  # unknown or river
 
-    def render(self, mode="human"):
+    def render(self, mode="human", logits=None):
         try:
             sw, sh = self.camera_size_px
             if not hasattr(self, "screen"):
@@ -459,11 +498,14 @@ class EnvAvoidObserver(gym.Env):
             pygame.draw.circle(self.screen, (255, 0, 0), (ax, ay), 16)
 
             font = pygame.font.SysFont("Arial", 20)
+            if logits is None:
+                logits = "None"
             lines = [
                 f"Step: {self.steps}",
                 f"Score: {getattr(self, 'total_reward', 0):.3f}",
                 f"Reward: {getattr(self, 'reward', 0):.3f}",
                 f"Action: {getattr(self, 'last_action', 'None')}",
+                f"logits: {logits}",
             ]
 
             for i, line in enumerate(lines):

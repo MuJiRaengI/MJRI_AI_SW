@@ -5,6 +5,8 @@ New_Solution*/
 pretrained/
 AvoidStoppedObserver/
 wandb/
+tts_examples/
+Starcraft_avoid_observer/
 *.png
 *.jpg
 *.jpeg

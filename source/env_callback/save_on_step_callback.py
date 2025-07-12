@@ -10,6 +10,26 @@ import psutil
 
 
 class SaveOnStepCallback(BaseCallback):
+    @staticmethod
+    def get_latest_last_model_path(save_dir, name_prefix):
+        """가장 최근(last) 모델 파일 경로 반환"""
+        import re
+
+        last_files = [
+            fname
+            for fname in os.listdir(save_dir)
+            if fname.startswith(f"{name_prefix}_last_") and fname.endswith(".zip")
+        ]
+        if not last_files:
+            return None
+
+        def extract_step(fname):
+            m = re.search(r"_last_(\\d+)\\.zip", fname)
+            return int(m.group(1)) if m else -1
+
+        last_files.sort(key=extract_step, reverse=True)
+        return os.path.join(save_dir, last_files[0])
+
     """
     Custom callback for saving a model when ep_rew_mean improves, and logging progress/episode info to json and console.
     """
@@ -121,7 +141,7 @@ class SaveOnStepCallback(BaseCallback):
                 self._current_ep_reward = 0
                 self._current_ep_length = 0
 
-        # ep_rew_mean이 갱신될 때만 저장
+        # best 모델 저장 (ep_rew_mean이 갱신될 때만)
         if len(self.episode_rewards) >= 10:
             ep_rew_mean = sum(self.episode_rewards[-100:]) / min(
                 len(self.episode_rewards), 100
@@ -146,6 +166,36 @@ class SaveOnStepCallback(BaseCallback):
 
                 # 이전 best 모델들 정리 (상위 5개만 유지)
                 self.cleanup_old_best_models()
+
+        # last 모델은 save_freq마다 저장 (항상 최신 1개만 유지)
+        if self.save_freq > 0 and self.n_calls % self.save_freq == 0:
+            gc.collect()
+            # 기존 last 모델 모두 삭제
+            while True:
+                last_path = self.get_latest_last_model_path(
+                    self.save_dir, self.name_prefix
+                )
+                if last_path is None:
+                    break
+                try:
+                    os.remove(last_path)
+                except Exception as e:
+                    print(f"[ERROR] 기존 last 모델 삭제 실패: {e}")
+                    break
+            # 새 last 모델 저장
+            last_model_path = os.path.join(
+                self.save_dir,
+                f"{self.name_prefix}_last_{int(self.num_timesteps)}.zip",
+            )
+            last_tmp_path = last_model_path.replace("zip", "tmp")
+            try:
+                with torch.no_grad():
+                    self.model.save(last_tmp_path)
+                os.replace(last_tmp_path, last_model_path)
+                if self.verbose > 0:
+                    print(f"[LAST] Last model saved: {last_model_path}")
+            except Exception as e:
+                print(f"[ERROR] last 모델 저장 실패: {e}")
 
         # 기존 logging 코드 유지
         if self.n_calls % self.logging_freq == 0:
