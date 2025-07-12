@@ -10,6 +10,11 @@ from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QDialog
 from qt_material import apply_stylesheet
+from pathlib import Path
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import TextLoader
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 
 from ui.designer.ui_main import Ui_main_window
 from ui.create_solution_window import CreateSolutionWindow
@@ -27,6 +32,7 @@ class MainWindow(QMainWindow, Ui_main_window):
         self.btn_new_solution.clicked.connect(self.slot_create_solution)
         self.btn_open_solution.clicked.connect(self.slot_open_solution)
 
+        self.actionUpdate_DB.triggered.connect(self.slot_update_vector_db)
         self.actionthanks.triggered.connect(self.show_contributors)
         self.actionLLMStart.triggered.connect(self.slot_llm_start)
         self.actionLLMStop.triggered.connect(self.slot_llm_stop)
@@ -37,6 +43,38 @@ class MainWindow(QMainWindow, Ui_main_window):
         # llm
         self.llm_process = None
         self.llm_queue = None
+        self.vectordb_file_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\vectordb"
+        self.vectordb_path = os.path.join(self.vectordb_file_path, "mjri_vector_db")
+
+    def slot_update_vector_db(self):
+        try:
+            all_files = list(Path(self.vectordb_file_path).glob("*.txt"))
+
+            documents = []
+            for file in all_files:
+                loader = TextLoader(str(file), encoding="utf-8")
+                documents.extend(loader.load())
+
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500, chunk_overlap=50
+            )
+            split_docs = text_splitter.split_documents(documents)
+            embedding_model = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            vectorstore = FAISS.from_documents(split_docs, embedding_model)
+            vectorstore.save_local(self.vectordb_path)
+
+            self.show_info_message(
+                "Vector DB Update",
+                f"Vector DB has been updated successfully.\nSaved to: {self.vectordb_path}",
+            )
+        except Exception as e:
+            self.show_info_message(
+                "Vector DB Update Error",
+                f"An error occurred while updating the Vector DB:\n{str(e)}",
+            )
+            print(f"[ERROR] Vector DB update failed: {e}")
 
     def slot_llm_start(self):
         if self.llm_process is not None and self.llm_process.is_alive():
@@ -54,6 +92,7 @@ class MainWindow(QMainWindow, Ui_main_window):
         self.llm_queue = Queue()
         self.llm_process = Process(target=run_llm, args=(self.log_path, self.llm_queue))
         self.llm_process.start()
+        self.llm_queue.put(("vectordb_path", self.vectordb_path))
         self.show_info_message("LLM Start", "LLM loading started. Please wait...")
 
     def slot_llm_stop(self):

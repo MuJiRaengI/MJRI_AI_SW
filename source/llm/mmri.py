@@ -16,10 +16,17 @@ import simpleaudio as sa
 import random
 from collections import deque
 from PIL import Image
-from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoProcessor,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+)
 from google.cloud import texttospeech
 from pydub import AudioSegment
 from pydub.playback import play
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -29,7 +36,7 @@ from selenium.webdriver.chrome.options import Options
 class MJRIBot:
     def __init__(self, log_path=None, queue=None):
         self.system_message = (
-            "당신은 말랭이 입니다. 당신을 소개할 때는 무지랭이의 AI봇인 말랭이라고 소개하세요. 당신은 유튜버 무지랭이의 AI봇입니다. 당신은 생방송을 혼자 진행하고 있으며 시청자의 질문에 친절히 답변해야 합니다. "
+            "당신은 말랭이 입니다. 당신을 소개할 때는 무지랭이의 AI비서 말랭이라고 소개하세요. 당신은 유튜버 무지랭이의 AI봇입니다. 당신은 생방송을 혼자 진행하고 있으며 시청자의 질문에 친절히 답변해야 합니다. "
             "단순 감탄사나 의미없는 질문에 대해서는 구독과 좋아요를 눌러달라는 답변을 해도 좋습니다. "
             "당신은 반드시 구어체를 사용해야 하며, 대답은 되도록 간단하고 명확해야 하며 중요한 내용으로 짧게 대답하세요. "
             "당신은 생방송에서 무지랭이의 방송에 해가되는 내용(마약, 정치, 폭력, 성적인 내용 등등)에 대한 답변을 할 수 없습니다. "
@@ -86,6 +93,24 @@ class MJRIBot:
             r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\tts_examples\silent_prompt"
         )
 
+        # 위험 단어 리스트를 파일에서 로드
+        blocked_keywords_path = (
+            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\blocked_keywords.txt"
+        )
+        if os.path.exists(blocked_keywords_path):
+            with open(blocked_keywords_path, encoding="utf-8") as f:
+                self.blocked_keywords = [line.strip() for line in f if line.strip()]
+        else:
+            self.blocked_keywords = ["true", "false", "system", "user", "assistant"]
+        self.blicked_path = (
+            r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\tts_examples\blicked_keywords"
+        )
+
+        # vector db 경로
+        self.vectordb_path = None
+        self.embedding_model = None
+        self.vectordb_threshold = 2.0  # 작을수록 유사
+
     def start(self):
         self.running = True
 
@@ -109,6 +134,19 @@ class MJRIBot:
     def stop(self):
         self.running = False
 
+    def contains_blocked_keyword(self, text):
+        """
+        입력된 text에 위험한 단어가 포함되어 있는지 확인.
+        - 한글/영어 혼합 가능
+        - 대소문자 구분 없이 검사
+        - 단어가 다른 단어의 일부로 섞여 있어도(예: astRuest) 탐지
+        """
+        lowered = text.lower()
+        for word in self.blocked_keywords:
+            if word in lowered:
+                return True
+        return False
+
     def check_chat(self):
         try:
             text_elements = self.driver.find_elements(
@@ -122,9 +160,7 @@ class MJRIBot:
                     continue
                 _text_elements.append(elem)
 
-            _no_text = True
             for elem in _text_elements[-3:]:
-                _no_text = False
                 self.driver.execute_script(
                     "arguments[0].classList.add('ignore_this')", elem
                 )
@@ -190,9 +226,20 @@ class MJRIBot:
                 batch = self.text_queue.popleft()
                 if batch is None:
                     break
-                nickname, text = batch
+                nickname, text, rag_results = batch
                 self.logger.info(f"질문: {nickname}: {text}") if self.logger else None
-                answer = self.chat(text)
+                if self.logger:
+                    if rag_results:
+                        rag_log = []
+                        for doc, score in rag_results:
+                            content = (
+                                doc.page_content.strip()
+                                .replace("\n", " ")
+                                .replace("\r", " ")
+                            )
+                            rag_log.append(f"[{score:.3f}] {content}")
+                        self.logger.info("RAG 결과: " + " << ".join(rag_log))
+                answer = self.chat(text, rag_results)
                 tts_answer = f"{nickname}님, {answer}"
                 self.logger.info(f"답변: {tts_answer}") if self.logger else None
                 self.tts_queue.append(("text", tts_answer))
@@ -200,8 +247,9 @@ class MJRIBot:
                 time.sleep(1)
 
     def load_model(self):
+        quant_config = BitsAndBytesConfig(load_in_8bit=True)
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, trust_remote_code=True, load_in_8bit=True
+            self.model_id, trust_remote_code=True, quantization_config=quant_config
         )
         self.preprocessor = AutoProcessor.from_pretrained(
             self.model_id, trust_remote_code=True
@@ -209,6 +257,8 @@ class MJRIBot:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 
     def append_text(self, nickname, text):
+        rag_results = None
+        # check text length
         if len(text) > self.text_length:
             (
                 self.logger.info(f"질문이 너무 깁니다: {nickname}: {text}")
@@ -220,13 +270,68 @@ class MJRIBot:
             selected_file = os.path.join(self.too_long_text_path, selected_file)
             self.tts_queue.append(("file", selected_file))
             return
-        # print(f"Appending text into queue: {nickname}: {text}")
-        self.text_queue.append((nickname, text))
 
-    def chat(self, text):
+        # check for blocked keywords
+        if self.contains_blocked_keyword(text):
+            (
+                self.logger.info(f"위험한 단어가 포함되어 있습니다: {nickname}: {text}")
+                if self.logger
+                else None
+            )
+            names = os.listdir(self.blicked_path)
+            selected_file = random.choice(names)
+            selected_file = os.path.join(self.blicked_path, selected_file)
+            self.tts_queue.append(("file", selected_file))
+            return
+
+        # check vectordb_path
+        try:
+            if self.vectordb_path is not None:
+                if os.path.exists(self.vectordb_path):
+                    vectorstore = FAISS.load_local(
+                        self.vectordb_path,
+                        self.embedding_model,
+                        allow_dangerous_deserialization=True,
+                    )
+                    results = vectorstore.similarity_search_with_score(text, k=5)
+                    rag_results = [
+                        (doc, score)
+                        for doc, score in results
+                        if score < self.vectordb_threshold
+                    ]
+        except Exception as e:
+            print(f"Error loading vector DB: {e}")
+
+        self.text_queue.append((nickname, text, rag_results))
+
+    def set_vectordb(self, path):
+        self.vectordb_path = path
+        self.embedding_model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+
+    def chat(self, text, rag_results=None):
         # print(f"Chatting with text: {text}")
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        system_message = self.system_message % now_str
+
+        # rag_results가 있으면 system_message에 참고 문서 추가
+        if rag_results is not None and len(rag_results) > 0:
+            rag_lines = []
+            for i, data in enumerate(rag_results):
+                content = (
+                    data[0].page_content.strip().replace("\n", " ").replace("\r", " ")
+                )
+                rag_lines.append(f"{i+1}. {content}")
+            rag_text = "\n".join(rag_lines)
+            system_message = (
+                (self.system_message % now_str)
+                + "\n\n아래는 참고한 문서야.\n"
+                + rag_text
+            )
+            print(f"RAG 결과: {rag_text}")
+        else:
+            system_message = self.system_message % now_str
+
         chat = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": f"{text}"},
@@ -299,6 +404,8 @@ def run_llm(log_path, queue=None):
             state, data = item
             if state == "stop":
                 llm.stop()
+            elif state == "vectordb_path":
+                llm.set_vectordb(data)
             elif state == "text":
                 nickname, text = data
                 # print(f"Received text: {nickname}: {text}")
@@ -322,24 +429,32 @@ def run_llm(log_path, queue=None):
 
 
 if __name__ == "__main__":
-    mjri_bot = MJRIBot()
-    # mjri_bot.load_model()
+    text = "지금 하고 있는 게임을 조금 더 자세하게 알려줘"
+
+    print(
+        f"위험한 단어가 포함되어 있나요? {text} -> {MJRIBot().contains_blocked_keyword(text)}"
+    )
+
+    mjri_bot = MJRIBot(r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\llm_log\test.txt")
+    mjri_bot.load_model()
     mjri_bot.start()
     # image_path = "테스트.png"
-    nickname = "무지랭이"
+    nickname = "시청자1"
     # text = "내가 워든 사냥을 갔는데 3번쨰 갔거든? 근데 또 죽어버렸어. 워든이 타겟팅을 바꿔서 철 골램이랑 싸우다 말고 나를 떄라더라고.. 너무 화가나 응원을 해줘. 그리고 마지막으로 시청자님들꼐 인사를 해줘."
     # text = "AI가 어떻게 대답함?"
     # text = "시청자님께 인사를 부탁해. 그리고 재미있는 이야기를 해줘"
-    text = "시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘"
+    # text = "시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘시청자님이 너무 긴 질문을 했어. 이 경우 답변이 어렵다고 대답해야 하는데 어떻게 하면 좋을 지 시범을 보여줘"
 
-    print("3초 대기")
+    # print("3초 대기")
     # time.sleep(3)  # 모델 로딩 대기
 
-    # mjri_bot.append_text(nickname, text)
+    vectordb_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\vectordb\mjri_vector_db"
+    mjri_bot.set_vectordb(vectordb_path)
+    mjri_bot.append_text(nickname, text)
 
     # mjri_bot.speech(
-    #     text="여러분 채팅을 남겨주시면 저와 대화를 할 수 있어요! 만약 제가 놓친 채팅이 있다면 다시 남겨주세요! 그리고 채팅을 안치실거면 구독이나 좋아요를 눌러주셔도 좋아요! 구독자 수가 늘어나면 무지랭이 님이 저한테 더 맛있는 전기를 주실거같아요!",
-    #     sound_save_path="silent_prompt_10.wav",
+    #     text="앗! 이런 질문은 제가 대답을 하지 못하게 되어있어요! 조심하세요! 무지랭이님이 보고계실지도 몰라요! 아직 시간이 있어요! 빨리 다른 질문으로 다시 질문해주세요!",
+    #     sound_save_path="blicked_keywords_10.wav",
     # )
 
     # print(f"{nickname}님이 질문: {text}")

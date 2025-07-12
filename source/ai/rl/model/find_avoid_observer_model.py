@@ -90,12 +90,14 @@ class ResidualMLP(nn.Module):
             hidden_features = in_features
 
         self.fc1 = nn.Linear(in_features, hidden_features)
-        self.bn1 = nn.BatchNorm1d(hidden_features)
+        # self.bn1 = nn.BatchNorm1d(hidden_features)
+        self.bn1 = nn.LayerNorm(hidden_features)
         # self.act = nn.ReLU(inplace=True)
         # self.act = nn.LeakyReLU(inplace=True)
         self.act = nn.GELU()
         self.fc2 = nn.Linear(hidden_features, out_features)
-        self.bn2 = nn.BatchNorm1d(out_features)
+        # self.bn2 = nn.BatchNorm1d(out_features)
+        self.bn2 = nn.LayerNorm(out_features)
 
         # projection for skip connection if needed
         if in_features != out_features:
@@ -189,7 +191,7 @@ class AutoEncoder(nn.Module):
         return out, feat
 
 
-class AvoidStoppedObserverExtractor(BaseFeaturesExtractor):
+class AvoidObserverExtractor(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space,
@@ -244,12 +246,77 @@ class AvoidStoppedObserverExtractor(BaseFeaturesExtractor):
             img = observations["image"].float()
             # print("image max:", img.max(), "min:", img.min())
             img_feat = self.resnet(img)
-        img_feat = self.conv2mlp(img_feat)
+            img_feat = self.conv2mlp(img_feat)
+            img_feat = img_feat * 0
 
-        with torch.no_grad():
-            vector = observations["vector"].float()
-            vec_feat = self.direct_mlp(vector)
-            vec_feat = vec_feat * 0
+        # with torch.no_grad():
+        vector = observations["vector"].float()
+        vec_feat = self.direct_mlp(vector)
+        # vec_feat = vec_feat * 0
 
         feat = th.cat([img_feat, vec_feat], dim=1)
         return self.final(feat)
+
+
+class AvoidObserverExtractor(BaseFeaturesExtractor):
+    def __init__(
+        self,
+        observation_space,
+        features_dim=256,
+    ):
+        super().__init__(observation_space, features_dim)
+        image_shape = observation_space.spaces["image"].shape  # (9, h, w)
+        vector_shape = observation_space.spaces["vector"].shape  # (4,)
+
+        in_image_channels = image_shape[0]
+        in_vector_channels = vector_shape[0]
+
+        # 하나의 resnet
+        self.resnet = models.resnet18(weights=None)
+        out_feature = self.resnet.conv1.out_channels
+        in_features = 512 * 4 * 4
+        self.resnet.conv1 = nn.Conv2d(
+            in_image_channels,
+            out_feature,
+            kernel_size=7,
+            stride=2,
+            padding=3,
+            bias=False,
+        )
+        self.resnet = nn.Sequential(
+            *list(self.resnet.children())[:-2],
+        )
+
+        self.img2feat = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_features, features_dim),
+        )
+
+        # 4개의 MLP (각 one-hot index별, resnet feature와 vector feature concat)
+        self.mlps = nn.ModuleList(
+            [
+                nn.Sequential(
+                    ResidualMLP(features_dim, features_dim, features_dim // 2),
+                    ResidualMLP(features_dim, features_dim, features_dim // 2),
+                    nn.Linear(features_dim, features_dim),
+                )
+                for _ in range(in_vector_channels)
+            ]
+        )
+
+    def forward(self, observations):
+        img = observations["image"].float()  # (B, 9, H, W)
+        with torch.no_grad():
+            img_feat = self.resnet(img)
+        img_feat = self.img2feat(img_feat)  # (B, features_dim)
+
+        vector = observations["vector"].float()  # (B, 4)
+        # 각 MLP에 img_feat을 넣고, vector(one-hot)로 마스킹
+        mlp_outputs = []
+        for i, mlp in enumerate(self.mlps):
+            mlp_out = mlp(img_feat)  # (B, features_dim)
+            mask = vector[:, i].unsqueeze(1)  # (B, 1)
+            masked_out = mlp_out * mask
+            mlp_outputs.append(masked_out)
+        out_feats = sum(mlp_outputs)  # (B, features_dim)
+        return out_feats

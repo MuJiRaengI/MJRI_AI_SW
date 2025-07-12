@@ -18,7 +18,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from source.envs.env import Env
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
 from source.ai.rl.model.find_avoid_observer_model import (
-    AvoidStoppedObserverExtractor,
+    AvoidObserverExtractor,
     DoubleResnet18,
     UNet,
 )

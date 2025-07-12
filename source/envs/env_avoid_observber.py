@@ -267,11 +267,14 @@ class EnvAvoidObserver(gym.Env):
         if self._is_goal(pos):
             return 1.0
         elif self._is_obstacle(pos) or self._check_collision():
-            return -5.0
+            return -10.0
 
-        reward = 0.5
-        # reward = -0.05
-        #
+        direction = np.array(self.get_direction_one_hot()).argmax()
+        degree = [np.pi / 4 * i for i in range(8)]
+        reward = np.cos(degree[direction * 2] - degree[action]) * 0.05 - 0.005
+
+        # reward = 0.0
+
         # direction = np.array(self.get_direction_one_hot()).argmax()
         # # 0 : 오른쪽
         # # 1 : 오른쪽 아래
@@ -283,24 +286,24 @@ class EnvAvoidObserver(gym.Env):
         # # 7 : 오른쪽 위
         # if direction == 0:  # right
         #     if action in [0, 1, 7]:
-        #         reward = 0.05
-        #     elif action in [2, 6]:
-        #         reward = 0.0
+        #         reward = 0.2
+        #     # elif action in [2, 6]:
+        #     #     reward = 0.0
         # elif direction == 1:  # down
         #     if action in [1, 2, 3]:
-        #         reward = 0.05
-        #     elif action in [0, 4]:
-        #         reward = 0.0
+        #         reward = 0.2
+        #     # elif action in [0, 4]:
+        #     #     reward = 0.0
         # elif direction == 2:  # left
         #     if action in [3, 4, 5]:
-        #         reward = 0.05
-        #     elif action in [2, 6]:
-        #         reward = 0.0
+        #         reward = 0.2
+        #     # elif action in [2, 6]:
+        #     #     reward = 0.0
         # elif direction == 3:  # up
         #     if action in [5, 6, 7]:
-        #         reward = 0.05
-        #     elif action in [0, 4]:
-        #         reward = 0.0
+        #         reward = 0.2
+        #     # elif action in [0, 4]:
+        #     #     reward = 0.0
 
         # # ======= 거리 기반 보상 계산 ========
         # # 현재 에이전트 좌표

@@ -15,7 +15,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from source.envs.env import Env
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
-from source.ai.rl.model.find_avoid_observer_model import AvoidStoppedObserverExtractor
+from source.ai.rl.model.find_avoid_observer_model import AvoidObserverExtractor
 from .env_avoid_observber import EnvAvoidObserver
 
 
@@ -32,7 +32,7 @@ class AvoidStoppedObserver(Env):
         self.deterministic = False
 
         self.max_step_length = 1000
-        self.num_observers = 500
+        self.num_observers = 300
 
     def key_info(self) -> str:
         return "[조작법] D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\n" "ESC: 종료\n"
@@ -158,7 +158,7 @@ class AvoidStoppedObserver(Env):
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
                 num_observers=self.num_observers,
-                random_start=True,
+                random_start=False,
                 move_observer=True,
             )
 
@@ -184,12 +184,12 @@ class AvoidStoppedObserver(Env):
 
         # 모델 생성 및 학습
         policy_kwargs = dict(
-            features_extractor_class=AvoidStoppedObserverExtractor,
+            features_extractor_class=AvoidObserverExtractor,
             features_extractor_kwargs=dict(features_dim=self.feature_dim),
         )
 
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\pretrained1.zip"
-        model_path = r""
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\ppo_find_avoid_observer_best_735532_-7.537.zip"
+        # model_path = r""
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             model = PPO.load(model_path, env=env, device="cuda")
@@ -212,22 +212,22 @@ class AvoidStoppedObserver(Env):
                 max_grad_norm=0.5,
             )
 
-        # pretrained AE
-        pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
-        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
-        pretrained_ae = torch.load(pretrained_ae_path, map_location="cuda")
+        # # pretrained AE
+        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
+        # # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
+        # pretrained_ae = torch.load(pretrained_ae_path, map_location="cuda")
 
-        new_state_dict = OrderedDict()
-        for k, v in pretrained_ae.items():
-            if k.startswith("encoder."):
-                new_key = k.replace("encoder.", "", 1)
-                new_state_dict[new_key] = v
-        print("load resnet encoder")
-        print(
-            model.policy.features_extractor.resnet.load_state_dict(
-                new_state_dict, strict=False
-            )
-        )
+        # new_state_dict = OrderedDict()
+        # for k, v in pretrained_ae.items():
+        #     if k.startswith("encoder."):
+        #         new_key = k.replace("encoder.", "", 1)
+        #         new_state_dict[new_key] = v
+        # print("load resnet encoder")
+        # print(
+        #     model.policy.features_extractor.resnet.load_state_dict(
+        #         new_state_dict, strict=False
+        #     )
+        # )
 
         model.learn(total_timesteps=self.total_timesteps, callback=callback)
 
@@ -251,7 +251,7 @@ class AvoidStoppedObserver(Env):
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
                 num_observers=self.num_observers,
-                random_start=True,
+                random_start=False,
                 move_observer=True,
             )
 
@@ -294,7 +294,7 @@ class AvoidStoppedObserver(Env):
                 max_steps_path = None
                 for fname in os.listdir(self.save_dir):
                     match = re.match(
-                        r"ppo_find_avoid_observer_best_(\d+)_(-?\d+)\.zip", fname
+                        r"ppo_find_avoid_observer_best_(\d+)_(-?\d+\.\d+)\.zip", fname
                     )
                     if match:
                         steps = int(match.group(1))
@@ -317,7 +317,7 @@ class AvoidStoppedObserver(Env):
             elif model is None:
                 print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
                 policy_kwargs = dict(
-                    features_extractor_class=AvoidStoppedObserverExtractor,
+                    features_extractor_class=AvoidObserverExtractor,
                     features_extractor_kwargs=dict(features_dim=self.feature_dim),
                 )
                 model = PPO(
