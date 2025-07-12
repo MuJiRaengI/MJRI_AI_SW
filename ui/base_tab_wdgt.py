@@ -205,8 +205,12 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self.pbar_state.setValue(0)
             # run_train(env_class, solution_dir, self._training_queue)
             self._train_process = multiprocessing.Process(
-                target=run_train,
-                args=(env_class, solution_dir, self._training_queue),
+                # old code
+                # target=run_train,
+                # args=(env_class, solution_dir, self._training_queue),
+
+                target=run_render,
+                args=(env_class, solution_dir, mode, self._training_queue),
             )
             self._train_process.start()
             self.btn_train.setText("Stop")

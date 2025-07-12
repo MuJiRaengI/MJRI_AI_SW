@@ -25,6 +25,8 @@ class MainWindow(QMainWindow, Ui_main_window):
         self.btn_open_solution.clicked.connect(self.slot_open_solution)
 
         self.actionthanks.triggered.connect(self.show_contributors)
+        self.actionLLMStart.triggered.connect(self.slot_llm_start)
+        self.actionLLMStop.triggered.connect(self.slot_llm_stop)
 
         self.create_solution_window = CreateSolutionWindow()
         self.contributors = ContributorsWindow()
@@ -54,6 +56,16 @@ class MainWindow(QMainWindow, Ui_main_window):
                 if tab_path == solution_path:
                     return i
         return -1
+
+    def slot_llm_start(self):
+        self.llm = None
+
+    def slot_llm_stop(self):
+        self.llm = None
+        self.show_info_message(
+            "LLM Stop",
+            "This feature is not implemented yet. Please check back later.",
+        )
 
     def slot_create_solution(self):
         solution = Solution()

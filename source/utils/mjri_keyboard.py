@@ -28,6 +28,10 @@ class MJRIKeyboard:
         self.press_and_release(str(number), delay=0.5)
         self.release("ctrl", delay=0.5)
 
+    def focus_numbering(self, number):
+        self.press_and_release(number, delay=0.02)
+        self.press_and_release(number, delay=0.02)
+
 
 if __name__ == "__main__":
     key = MJRIKeyboard()
