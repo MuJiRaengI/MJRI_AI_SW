@@ -158,7 +158,7 @@ class AvoidStoppedObserver(Env):
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
                 num_observers=self.num_observers,
-                random_start=False,
+                random_start=True,
                 move_observer=True,
             )
 
@@ -188,8 +188,8 @@ class AvoidStoppedObserver(Env):
             features_extractor_kwargs=dict(features_dim=self.feature_dim),
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\ppo_find_avoid_observer_best_735532_-7.537.zip"
-        # model_path = r""
+        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\logs\ppo_find_avoid_observer_best_735532_-7.537.zip"
+        model_path = r""
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             model = PPO.load(model_path, env=env, device="cuda")
@@ -212,22 +212,22 @@ class AvoidStoppedObserver(Env):
                 max_grad_norm=0.5,
             )
 
-        # # pretrained AE
-        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
-        # # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
-        # pretrained_ae = torch.load(pretrained_ae_path, map_location="cuda")
+        # pretrained AE
+        pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_best.pth"
+        # pretrained_ae_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\pretrained\avoid_observer\autoencoder_tyndall_log.pth"
+        pretrained_ae = torch.load(pretrained_ae_path, map_location="cuda")
 
-        # new_state_dict = OrderedDict()
-        # for k, v in pretrained_ae.items():
-        #     if k.startswith("encoder."):
-        #         new_key = k.replace("encoder.", "", 1)
-        #         new_state_dict[new_key] = v
-        # print("load resnet encoder")
-        # print(
-        #     model.policy.features_extractor.resnet.load_state_dict(
-        #         new_state_dict, strict=False
-        #     )
-        # )
+        new_state_dict = OrderedDict()
+        for k, v in pretrained_ae.items():
+            if k.startswith("encoder."):
+                new_key = k.replace("encoder.", "", 1)
+                new_state_dict[new_key] = v
+        print("load resnet encoder")
+        print(
+            model.policy.features_extractor.resnet.load_state_dict(
+                new_state_dict, strict=False
+            )
+        )
 
         model.learn(total_timesteps=self.total_timesteps, callback=callback)
 
@@ -251,7 +251,7 @@ class AvoidStoppedObserver(Env):
             return EnvAvoidObserver(
                 max_steps=self.max_step_length,
                 num_observers=self.num_observers,
-                random_start=False,
+                random_start=True,
                 move_observer=True,
             )
 

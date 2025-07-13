@@ -289,16 +289,15 @@ class AvoidObserverExtractor(BaseFeaturesExtractor):
 
         self.img2feat = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features, features_dim),
+            nn.Linear(in_features, features_dim * 4),
         )
 
         # 4개의 MLP (각 one-hot index별, resnet feature와 vector feature concat)
         self.mlps = nn.ModuleList(
             [
                 nn.Sequential(
-                    ResidualMLP(features_dim, features_dim, features_dim // 2),
-                    ResidualMLP(features_dim, features_dim, features_dim // 2),
-                    nn.Linear(features_dim, features_dim),
+                    ResidualMLP(features_dim * 4, features_dim * 4, features_dim),
+                    nn.Linear(features_dim * 4, features_dim),
                 )
                 for _ in range(in_vector_channels)
             ]
