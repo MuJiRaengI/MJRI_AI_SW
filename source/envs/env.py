@@ -43,9 +43,11 @@ class Env(abc.ABC):
             return self._random_play(*args, **kwargs)
         elif mode == "train":
             self.training_queue = queue
-            return self._train(*args, **kwargs)
+            # return self._train(*args, **kwargs)
+            return self._train_bbf(*args, **kwargs)
         elif mode == "test":
             self.render_queue = queue
-            return self._test(*args, **kwargs)
+            # return self._test(*args, **kwargs)
+            return self._test_bbf(*args, **kwargs)
         else:
             raise ValueError(f"Unknown mode: {mode}")
