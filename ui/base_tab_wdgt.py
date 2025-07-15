@@ -30,9 +30,15 @@ from source.solution.solution import Solution
 from source.utils.thread import EnvWorker
 
 
-def run_render(env_class, solution_dir, mode, queue=None, *args, **kwargs):
+# 프로세스 실행 함수
+def run_train(env_class, solution_dir, queue=None):
     env = env_class()
-    env.play(solution_dir, mode, queue, *args, **kwargs)
+    env.play(solution_dir, "train", queue)
+
+
+def run_render(env_class, solution_dir, mode, queue=None):
+    env = env_class()
+    env.play(solution_dir, mode, queue)
 
 
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
@@ -197,8 +203,12 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self.pbar_state.setMinimum(0)
             self.pbar_state.setMaximum(0)
             self.pbar_state.setValue(0)
-            # run_render(env_class, solution_dir, self._training_queue)
+            # run_train(env_class, solution_dir, self._training_queue)
             self._train_process = multiprocessing.Process(
+                # old code
+                # target=run_train,
+                # args=(env_class, solution_dir, self._training_queue),
+
                 target=run_render,
                 args=(env_class, solution_dir, mode, self._training_queue),
             )
@@ -248,7 +258,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self._render_process = multiprocessing.Process(
                 target=run_render,
                 args=(env_class, solution_dir, mode, self._render_queue),
-                kwargs={"screen_pos": self._get_real_time_preview_pos()},
+
             )
             self._render_process.start()
             btn.setText("Stop")
@@ -425,22 +435,22 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         offset_y = client_top - win_top
         return offset_x, offset_y
 
-    def _get_real_time_preview_pos(self):
-        base_x, base_y = self.get_target_window_position()
-        x = base_x + self.spbx_screen_x.value()
-        y = base_y + self.spbx_screen_y.value()
-        w = self.spbx_screen_w.value()
-        h = self.spbx_screen_h.value()
-        return x, y, w, h
+
+
+
+
+
+
+
 
     def _start_real_time_preview(self):
         def update_preview():
-            # base_x, base_y = self.get_target_window_position()
-            # x = base_x + self.spbx_screen_x.value()
-            # y = base_y + self.spbx_screen_y.value()
-            # w = self.spbx_screen_w.value()
-            # h = self.spbx_screen_h.value()
-            x, y, w, h = self._get_real_time_preview_pos()
+            base_x, base_y = self.get_target_window_position()
+            x = base_x + self.spbx_screen_x.value()
+            y = base_y + self.spbx_screen_y.value()
+            w = self.spbx_screen_w.value()
+            h = self.spbx_screen_h.value()
+
             screen = QApplication.primaryScreen()
             if screen:
                 pixmap = screen.grabWindow(0, x, y, w, h)

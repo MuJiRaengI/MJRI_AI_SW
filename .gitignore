@@ -4,6 +4,7 @@ Find_op_map_path/
 New_Solution*/
 pretrained/
 AvoidStoppedObserver/
+wandb/
 tts_examples/
 Starcraft_avoid_observer/
 llm_log/
