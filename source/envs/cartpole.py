@@ -23,6 +23,9 @@ class CartPole(Env):
         self.total_timesteps = 1000000
         self.n_envs = 8
 
+        self.save_freq = 5000
+        self.logging_freq = 1000
+
     def key_info(self) -> str:
         return "[조작법] A: 왼쪽, D: 오른쪽\n"
 
@@ -149,7 +152,7 @@ class CartPole(Env):
                 max_steps = -1
                 max_steps_path = None
                 for fname in os.listdir(self.save_dir):
-                    match = re.match(r"ppo_cartpole_(\d+)_steps.zip", fname)
+                    match = re.match(r"ppo_cartpole_best_(\d+)_([-\d\.]+)\.zip", fname)
                     if match:
                         steps = int(match.group(1))
                         if steps > max_steps:

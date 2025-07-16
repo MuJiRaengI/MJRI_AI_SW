@@ -33,7 +33,7 @@ class Breakout(Env):
         self.env_id = "Breakout-v4"
         # self.total_timesteps = 50000000
         self.total_timesteps = 500000
-        self.save_freq = 5000
+        self.save_freq = 1000
         self.logging_freq = 1000
         self.n_envs = 8
         self.scale = 4
@@ -209,21 +209,11 @@ class Breakout(Env):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)
 
-        callback = SaveOnStepCallback(
-            save_freq=self.save_freq,
-            logging_freq=self.logging_freq,
-            save_dir=self.save_dir,
-            name_prefix="bbf_breakout",
-            log_dir=log_dir,
-            progress_queue=self.training_queue,
-            verbose=1,
-        )
         agent.learn(
             total_timesteps=self.total_timesteps,
             save_freq=self.save_freq,
             save_path=self.save_dir,
             name_prefix="bbf_breakout",  # save file name prefix
-            callback=callback,
         )
 
         # 학습 완료 신호

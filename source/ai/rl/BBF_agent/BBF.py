@@ -2,6 +2,7 @@ from collections import deque
 from itertools import chain
 import tqdm
 import copy
+import os
 from multiprocessing import freeze_support
 
 import numpy as np
@@ -66,8 +67,8 @@ class BBF:
         save_freq=None,
         save_path=None,
         name_prefix="bbf",
-        callback=None,
     ):
+
         perception_modules = [self.model.encoder_cnn, self.model.transition]
         actor_modules = [
             self.model.prediction,
@@ -208,16 +209,18 @@ class BBF:
                         grad_step += 1
 
                 if save_freq != None and ((step + 1) % save_freq) == 0:
-                    if callback is not None:
-                        callback.locals = {
-                            "rewards": reward,
-                            "dones": done_flag,
-                            "model": self.model,
-                            "num_timesteps": step,
-                        }
-                        callback.num_timesteps = step
-                        callback.model = self.model
-                        callback._on_step()
+                    save_checkpoint_path = (
+                        f"{save_path}/{name_prefix}_{step+1}_steps.tmp"
+                    )
+                    save_checkpoint(self.model, self.model_target, save_checkpoint_path)
+                    # renaming
+                    try:
+                        os.replace(
+                            save_checkpoint_path,
+                            f"{save_path}/{name_prefix}_{step+1}_steps.pth",
+                        )
+                    except Exception as e:
+                        print(f"[ERROR] 파일 교체 실패: {e}")
 
                 if grad_step > self.reset_freq:
                     # eval()
@@ -269,7 +272,7 @@ class BBF:
 
                 if len(log_t) > 0:
                     for log in log_t:
-                        print({"eps_reward": eps_reward[log].sum()})
+                        # print({"eps_reward": eps_reward[log].sum()})
                         scores.append(eps_reward[log].clone())
 
                     eps_reward[log_t] = 0
@@ -284,19 +287,9 @@ class BBF:
                         for i in range(4):
                             states.append(state)
 
-            if callback is not None:
-                callback.locals = {
-                    "rewards": reward,
-                    "dones": done_flag,
-                    "model": self.model,
-                    "num_timesteps": step,
-                }
-                callback.num_timesteps = step
-                callback.model = self.model
-                callback._on_step()
-            # save_checkpoint(
-            #     self.model, self.model_target, f"{save_path}/{name_prefix}.pth"
-            # )
+            save_checkpoint(
+                self.model, self.model_target, f"{save_path}/{name_prefix}.pth"
+            )
 
     def optimize(self, grad_step, n):
         self.model.train()
@@ -423,14 +416,14 @@ class BBF:
 
         lr = self.optimizer.param_groups[0]["lr"]
 
-        print(
-            f"Step: {grad_step}, Loss: {loss.item():.4f}, DQN Loss: {dqn_loss.item():.4f}, "
-            f"Recon Loss: {recon_loss.mean().item():.4f}, LR: {lr:.6f}, "
-            f"Returns: {plot_vs.mean().item():.4f}, Buffer Rewards: {rewards.mean(0).sum().item():.4f}, "
-            f"Is W: {is_w.mean().item():.4f}, Gamma: {gamma_step.item():.4f}, "
-            f"TD Error: {td_error.item():.4f}, Param Norm: {param_norm.sum().item():.4f}, "
-            f"Grad Norm: {grad_norm.sum().item():.4f}"
-        )
+        # print(
+        #     f"Step: {grad_step}, Loss: {loss.item():.4f}, DQN Loss: {dqn_loss.item():.4f}, "
+        #     f"Recon Loss: {recon_loss.mean().item():.4f}, LR: {lr:.6f}, "
+        #     f"Returns: {plot_vs.mean().item():.4f}, Buffer Rewards: {rewards.mean(0).sum().item():.4f}, "
+        #     f"Is W: {is_w.mean().item():.4f}, Gamma: {gamma_step.item():.4f}, "
+        #     f"TD Error: {td_error.item():.4f}, Param Norm: {param_norm.sum().item():.4f}, "
+        #     f"Grad Norm: {grad_norm.sum().item():.4f}"
+        # )
 
     def save(self, save_path):
         save_checkpoint(self.model, self.model_target, save_path)
