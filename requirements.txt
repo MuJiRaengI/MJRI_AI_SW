@@ -1,12 +1,11 @@
-gym
-gym[atari]
+gymnasium
 autorom
 pyside6
 pywin32
 opencv-python
 qt_material
 psutil
-transformers==4.52.4
+transformers
 einops
 timm
 av
@@ -19,7 +18,7 @@ ale-py
 pygame
 stable-baselines3[extra]
 keyboard
-numpy==1.23.5
+numpy
 google-cloud-texttospeech
 pydub 
 emoji

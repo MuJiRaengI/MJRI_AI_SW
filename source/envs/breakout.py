@@ -5,7 +5,12 @@ sys.path.append(os.path.abspath("."))
 
 import re
 import time
-import gym
+
+# import gym
+import gymnasium as gym
+import ale_py
+
+gym.register_envs(ale_py)
 import torch
 import numpy as np
 from collections import deque
@@ -21,14 +26,14 @@ from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 from source.ai.rl.BBF_agent.BBF import BBF
 from source.ai.rl.model.breakout_bbf import BBF_Model
 
+
 class Breakout(Env):
     def __init__(self):
         super().__init__()
         self.env_id = "Breakout-v4"
         # self.total_timesteps = 50000000
-        self.total_timesteps = 100000
-        # self.save_freq = 5000
-        self.save_freq = 10000
+        self.total_timesteps = 500000
+        self.save_freq = 5000
         self.logging_freq = 1000
         self.n_envs = 8
         self.scale = 4
@@ -39,7 +44,7 @@ class Breakout(Env):
         return "[조작법] A: 왼쪽, D: 오른쪽, SPACE: FIRE(시작/재시작)\n"
 
     def _self_play(self, *args, **kwargs):
-        env = gym.make(self.env_id, render_mode="rgb_array")
+        env = gym.make("ALE/Breakout-v5", render_mode="rgb_array")
         env.metadata["render_fps"] = self.fps
         obs, info = env.reset()
 
@@ -163,70 +168,6 @@ class Breakout(Env):
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
 
-        env = make_vec_env(self.env_id, n_envs=self.n_envs)
-        env = VecFrameStack(env, n_stack=self.n_stack)
-
-        # 진행상황 전달
-        if self.training_queue is not None:
-            self.training_queue.put(("total_steps", self.total_timesteps))
-
-        callback = SaveOnStepCallback(
-            save_freq=self.save_freq,
-            logging_freq=self.logging_freq,
-            save_dir=self.save_dir,
-            name_prefix="ppo_breakout",
-            log_dir=log_dir,
-            progress_queue=self.training_queue,
-            verbose=1,
-        )
-        # 모델 생성 및 학습
-        # model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
-
-        policy_kwargs = dict(
-            features_extractor_class=BreakoutResnet,
-            features_extractor_kwargs=dict(features_dim=64),
-        )
-
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
-        if os.path.exists(model_path):
-            print(f"기존 모델을 불러옵니다: {model_path}")
-            model = PPO.load(model_path, env=env, policy=BreakoutResnet, device="cuda")
-        else:
-            model = PPO(
-                "CnnPolicy",
-                env,
-                policy_kwargs=policy_kwargs,
-                device="cuda",
-                verbose=1,
-                n_steps=128,  # rollout buffer size (default: 2048, Atari에서는 128~256 추천)
-                batch_size=256,  # minibatch size (default: 64, Atari에서는 256~1024 추천)
-                n_epochs=4,  # update epochs (default: 10, Atari에서는 4~6 추천)
-                gamma=0.99,  # discount factor
-                gae_lambda=0.95,  # GAE lambda
-                ent_coef=0.01,  # entropy coefficient (default: 0.0, exploration 증가)
-                learning_rate=2.5e-4,  # learning rate (Atari 논문/Stable-Baselines3 권장)
-                clip_range=0.1,  # policy clip range (default: 0.2, Atari에서는 0.1~0.2)
-                vf_coef=0.5,  # value function loss coefficient
-                max_grad_norm=0.5,  # gradient clipping
-            )
-        model.learn(total_timesteps=self.total_timesteps, callback=callback)
-
-        # 학습 완료 신호
-        if self.training_queue is not None:
-            self.training_queue.put(("done", None))
-
-        # 모델 저장
-        save_path = os.path.join(self.save_dir, "ppo_breakout.zip")
-        tmp_path = save_path.replace("zip", "tmp")
-        model.save(tmp_path)
-        os.replace(tmp_path, save_path)
-        print(f"모델 저장 완료: {save_path}")
-
-    def _train_bbf(self, *args, **kwargs):
-        log_dir = os.path.join(self.save_dir, self.log_dir)
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-
         env = gym.make("ALE/Breakout-v5")
         n_actions = env.action_space.n
 
@@ -238,13 +179,13 @@ class Breakout(Env):
         # model = PPO("CnnPolicy", env, verbose=1, device="cuda", learning_rate=2.5e-4)
 
         model = BBF_Model(
-            n_actions, # env action space size
-            hiddens=2048, # representation dim
+            n_actions,  # env action space size
+            hiddens=2048,  # representation dim
             scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-10,  # min value in distributional RL
-            Vmax=10, # max value in distributional RL
-            resize=(96, 72) # input resize
+            Vmax=10,  # max value in distributional RL
+            resize=(96, 72),  # input resize
         ).cuda()
 
         agent = BBF(
@@ -252,15 +193,15 @@ class Breakout(Env):
             env,
             learning_rate=1e-4,
             batch_size=32,
-            ema_decay=0.995, # target model ema decay
-            initial_gamma=0.97, # starting gamma
-            final_gamma=0.997, # final gamma
-            initial_n=10, # starting n-step
-            final_n=3, # final n-step
-            num_buckets=51, # buckets in distributional RL
-            reset_freq=40000, # reset schedule in grad step
-            replay_ratio=2, # update number in one step
-            weight_decay=0.1 # weight decay in optimizer,
+            ema_decay=0.995,  # target model ema decay
+            initial_gamma=0.97,  # starting gamma
+            final_gamma=0.997,  # final gamma
+            initial_n=10,  # starting n-step
+            final_n=3,  # final n-step
+            num_buckets=51,  # buckets in distributional RL
+            reset_freq=40000,  # reset schedule in grad step
+            replay_ratio=2,  # update number in one step
+            weight_decay=0.1,  # weight decay in optimizer,
         )
 
         model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Breakout\logs\ppo_breakout_590000_steps.zip"
@@ -268,13 +209,21 @@ class Breakout(Env):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)
 
+        callback = SaveOnStepCallback(
+            save_freq=self.save_freq,
+            logging_freq=self.logging_freq,
+            save_dir=self.save_dir,
+            name_prefix="bbf_breakout",
+            log_dir=log_dir,
+            progress_queue=self.training_queue,
+            verbose=1,
+        )
         agent.learn(
             total_timesteps=self.total_timesteps,
             save_freq=self.save_freq,
             save_path=self.save_dir,
-            name_prefix="bbf_breakout", # save file name prefix
-            project_name="Breakout",  # wandb project name
-            exp_name="BBF" # wandb experience name
+            name_prefix="bbf_breakout",  # save file name prefix
+            callback=callback,
         )
 
         # 학습 완료 신호
@@ -286,95 +235,7 @@ class Breakout(Env):
         agent.save(save_path)
         print(f"모델 저장 완료: {save_path}")
 
-
     def _test(self, *args, **kwargs):
-        last_model_path = None
-        model = None
-        # 학습과 동일하게 VecFrameStack 적용
-        env = DummyVecEnv([lambda: gym.make(self.env_id, render_mode="rgb_array")])
-        env = VecFrameStack(env, n_stack=self.n_stack)
-        obs = env.reset()
-
-        pygame.init()
-        frame = env.envs[0].render()
-        h, w, _ = frame.shape
-        h, w = h * self.scale, w * self.scale
-        screen = pygame.display.set_mode((h, w))
-        pygame.display.set_caption("Breakout Test (Pygame UI)")
-        clock = pygame.time.Clock()
-
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    env.close()
-                    pygame.quit()
-                    if self.render_queue is not None:
-                        self.render_queue.put(("done", None))
-                    return
-
-            if self.render_queue is not None and not self.render_queue.empty():
-                msg = self.render_queue.get()
-                if isinstance(msg, tuple) and msg[0] == "stop":
-                    break
-
-            # 모델 파일 탐색 및 필요시 reload
-            model_path = os.path.join(self.save_dir, "ppo_breakout.zip")
-            if not os.path.exists(model_path):
-                max_steps = -1
-                max_steps_path = None
-                for fname in os.listdir(self.save_dir):
-                    match = re.match(r"ppo_breakout_best_(\d+)_\d+\.zip", fname)
-                    if match:
-                        steps = int(match.group(1))
-                        if steps > max_steps:
-                            max_steps = steps
-                            max_steps_path = os.path.join(self.save_dir, fname)
-                if max_steps_path:
-                    model_path = max_steps_path
-            if model_path != last_model_path and os.path.exists(model_path):
-                time.sleep(0.5)  # 잠시 대기 후 모델 로드
-                print(f"모델 업데이트: {model_path}")
-                model = PPO.load(model_path, policy=BreakoutResnet, device="cuda")
-                last_model_path = model_path
-            elif model is None:
-                print("테스트 가능한 모델 파일이 없습니다. (기본 PPO로 테스트)")
-                policy_kwargs = dict(
-                    features_extractor_class=BreakoutResnet,
-                    features_extractor_kwargs=dict(features_dim=64),
-                )
-                model = PPO(
-                    "CnnPolicy",
-                    env,
-                    policy_kwargs=policy_kwargs,
-                    device="cuda",
-                    verbose=1,
-                )
-                last_model_path = None
-
-            # 모델 예측
-            action, _ = model.predict(obs, deterministic=self.deterministic)
-            obs, reward, done, info = env.step(action)
-            frame = env.envs[0].render()
-
-            scaled_frame = pygame.transform.scale(
-                pygame.surfarray.make_surface(frame.swapaxes(0, 1)),
-                (h, w),
-            )
-            screen.blit(scaled_frame, (0, 0))
-            pygame.display.flip()
-
-            if done[0]:
-                obs = env.reset()
-
-            clock.tick(self.fps)
-
-        env.close()
-        pygame.quit()
-        if self.render_queue is not None:
-            self.render_queue.put(("done", None))
-
-    def _test_bbf(self, *args, **kwargs):
         last_model_path = None
         model = None
 
@@ -443,12 +304,14 @@ class Breakout(Env):
 
             # 모델 예측
             # model input : [batch, frameStack, channel, height, width]
-            action = model.predict(torch.cat(list(states),-3).unsqueeze(0))  # 마지막 4개 Frame 입력
+            action = model.predict(
+                torch.cat(list(states), -3).unsqueeze(0)
+            )  # 마지막 4개 Frame 입력
             obs, reward, done, trunc, info = env.step(action.cpu().numpy())
             done = done or trunc
             last_frame = frame
             frame = np.array(env.render())
-            
+
             if np.array_equal(last_frame, frame):
                 env.step(1)
 
@@ -485,4 +348,9 @@ if __name__ == "__main__":
     # breakout.save_dir = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\test"
     # breakout.log_dir = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\test\logs"
     breakout.save_dir = r"C:\Users\onlyb\Documents\RL project\MJRI_AI_SW\test"
-    breakout._train_bbf()
+    # breakout._test()
+    breakout.play(
+        save_dir=breakout.save_dir,
+        mode="self_play",
+        queue=None,
+    )

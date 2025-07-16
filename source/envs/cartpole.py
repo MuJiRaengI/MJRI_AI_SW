@@ -5,7 +5,9 @@ sys.path.append(os.path.abspath("."))
 
 import re
 import time
-import gym
+
+# import gym
+import gymnasium as gym
 import pygame
 import keyboard
 from stable_baselines3 import PPO
@@ -109,8 +111,8 @@ class CartPole(Env):
             self.training_queue.put(("total_steps", self.total_timesteps))
 
         callback = SaveOnStepCallback(
-            save_freq=10000,
-            logging_freq=10000,
+            save_freq=self.save_freq,
+            logging_freq=self.logging_freq,
             save_dir=self.save_dir,
             name_prefix="ppo_cartpole",
             log_dir=log_dir,

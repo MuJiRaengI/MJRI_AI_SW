@@ -1,5 +1,8 @@
-import gym
-from gym import spaces
+# import gym
+import gymnasium as gym
+
+# from gym import spaces
+import gymnasium.spaces as spaces
 import numpy as np
 import pygame
 import torch

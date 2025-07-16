@@ -7,7 +7,9 @@ from .resnet import Resnet18
 from .unet import UNet
 from torchvision import models
 import torch
-import gym
+
+# import gym
+import gymnasium as gym
 
 
 class DoubleResnet18(nn.Module):

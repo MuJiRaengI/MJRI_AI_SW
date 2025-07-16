@@ -33,7 +33,8 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    import gym
+    # import gym
+    import gymnasium as gym
     import pygame
     from stable_baselines3 import PPO
     from BBF_agent.BBF import BBF

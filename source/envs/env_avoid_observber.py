@@ -1,5 +1,8 @@
-import gym
-from gym import spaces
+# import gym
+import gymnasium as gym
+
+# from gym import spaces
+import gymnasium.spaces as spaces
 import numpy as np
 import pygame
 import torch
@@ -267,12 +270,11 @@ class EnvAvoidObserver(gym.Env):
         if self._is_goal(pos):
             return 1.0
         elif self._is_obstacle(pos) or self._check_collision():
-            return -10.0
+            return -0.5
 
-        # direction = np.array(self.get_direction_one_hot()).argmax()
-        # degree = [np.pi / 4 * i for i in range(8)]
-        # reward = np.cos(degree[direction * 2] - degree[action]) * 0.2 - 0.05
-        reward = 0.05
+        direction = np.array(self.get_direction_one_hot()).argmax()
+        degree = [np.pi / 4 * i for i in range(8)]
+        reward = np.cos(degree[direction * 2] - degree[action]) * 0.1
 
         # reward = 0.0
 
