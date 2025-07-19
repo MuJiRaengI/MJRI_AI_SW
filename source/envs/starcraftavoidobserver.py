@@ -12,7 +12,8 @@ import cv2
 import numpy as np
 import torch.nn as nn
 from collections import OrderedDict
-from stable_baselines3 import PPO
+from source.ai.rl.BBF_agent.BBF import BBF
+from source.ai.rl.model.avoid_observer_bbf import BBF_Model
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from source.envs.env import Env
@@ -24,6 +25,7 @@ from source.ai.rl.model.find_avoid_observer_model import (
 )
 from source.envs.env_starcraft import EnvStarcraft
 import keyboard
+from collections import deque
 
 
 class StarcraftAvoidObserver(Env):
@@ -128,7 +130,6 @@ class StarcraftAvoidObserver(Env):
                 bg = cv2.morphologyEx(bg, cv2.MORPH_OPEN, kernel, iterations=2)
 
                 print("time : {:.3f}s".format(time.time() - tmr))
-                print()
 
             clock.tick(self.fps)
 
@@ -212,6 +213,7 @@ class StarcraftAvoidObserver(Env):
         pygame.display.set_caption("Starcraft Avoid Observer Random Play (ESC: Quit)")
         clock = pygame.time.Clock()
         self.running = True
+        frames = deque(maxlen=4)
         while self.running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -255,16 +257,35 @@ class StarcraftAvoidObserver(Env):
 
                 bg = detect[0, 0]
                 observer = detect[0, 1]
-                # char = detect[0, 2]
+                char = detect[0, 2]
                 # path = detect[0, 3]
 
                 # postprocessing
                 kernel = np.ones((5, 5), np.uint8)
-                # observer = cv2.morphologyEx(observer, cv2.MORPH_OPEN, kernel)
+                observer = cv2.morphologyEx(observer, cv2.MORPH_OPEN, kernel)
                 observer = cv2.morphologyEx(
                     observer, cv2.MORPH_CLOSE, kernel, iterations=2
                 )
                 bg = cv2.morphologyEx(bg, cv2.MORPH_OPEN, kernel, iterations=2)
+
+                frame = np.zeros((bg.shape[0], bg.shape[1], 3), dtype=np.uint8)
+
+                frame[:, :, 2] = bg
+                frame[:, :, 1] = observer
+                frame[:, :, 0] = char
+
+                frames.append(frame)
+                if frames < 4:
+                    continue
+
+                # _h, _w = frame.shape[:2]
+                # center = (_w // 2, _h // 2)
+                # radius = min(_h, _w) // 30  # 원 크기 조절 (예시: 전체의 1/10)
+                # color = (255, 0, 0)  # 파란색 (BGR)
+                # thickness = -1  # 채운 원
+                # cv2.circle(frame, center, radius, color, thickness)
+
+                print()
 
             clock.tick(self.fps)
 

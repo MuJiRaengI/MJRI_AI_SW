@@ -34,7 +34,7 @@ class AvoidStoppedObserver(Env):
         self.deterministic = False
 
         self.max_step_length = 2000
-        self.num_observers = 500
+        self.num_observers = 300
 
     def key_info(self) -> str:
         return "[조작법] D(→), C(↘), S(↓), Z(↙), A(←), Q(↖), W(↑), E(↗)\n" "ESC: 종료\n"
@@ -200,18 +200,16 @@ class AvoidStoppedObserver(Env):
             stackFrame=False,
         )
 
-        # model_path = r""
-        # if os.path.exists(model_path):
-        #     print(f"기존 모델을 불러옵니다: {model_path}")
-        #     agent.load(model_path)
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction\bbf_avoid_observer_50000_steps.pth"
+        if os.path.exists(model_path):
+            print(f"기존 모델을 불러옵니다: {model_path}")
+            agent.load(model_path)
 
         agent.learn(
             total_timesteps=self.total_timesteps,
             save_freq=self.save_freq,
             save_path=self.save_dir,
             name_prefix="bbf_avoid_observer",  # save file name prefix
-            project_name="avoid_observer",
-            exp_name="BBF",
         )
 
         # 학습 완료 신호
@@ -301,8 +299,10 @@ class AvoidStoppedObserver(Env):
             if model is not None:
                 # 모델 예측
                 action = model.predict(state.unsqueeze(0))
+                inputs = state[0, :3]
                 obs, reward, done, info = env.step(action.cpu().item())
                 state = model.preprocess(obs).unsqueeze(0)
+                img = state[0, :3]
                 single_env.render()
 
                 if done:

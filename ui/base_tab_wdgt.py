@@ -31,14 +31,9 @@ from source.utils.thread import EnvWorker
 
 
 # 프로세스 실행 함수
-def run_train(env_class, solution_dir, queue=None):
+def run_render(env_class, solution_dir, mode, queue=None, screen_pos=None):
     env = env_class()
-    env.play(solution_dir, "train", queue)
-
-
-def run_render(env_class, solution_dir, mode, queue=None):
-    env = env_class()
-    env.play(solution_dir, mode, queue)
+    env.play(solution_dir, mode, queue, screen_pos=screen_pos)
 
 
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
@@ -203,14 +198,16 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self.pbar_state.setMinimum(0)
             self.pbar_state.setMaximum(0)
             self.pbar_state.setValue(0)
-            # run_train(env_class, solution_dir, self._training_queue)
+            base_x, base_y = self.get_target_window_position()
+            screen_pos = (
+                base_x + self.spbx_screen_x.value(),
+                base_y + self.spbx_screen_y.value(),
+                self.spbx_screen_w.value(),
+                self.spbx_screen_h.value(),
+            )
             self._train_process = multiprocessing.Process(
-                # old code
-                # target=run_train,
-                # args=(env_class, solution_dir, self._training_queue),
-
                 target=run_render,
-                args=(env_class, solution_dir, mode, self._training_queue),
+                args=(env_class, solution_dir, mode, self._training_queue, screen_pos),
             )
             self._train_process.start()
             self.btn_train.setText("Stop")
@@ -255,10 +252,16 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                     )
 
             self._render_queue = Queue()
+            base_x, base_y = self.get_target_window_position()
+            screen_pos = (
+                base_x + self.spbx_screen_x.value(),
+                base_y + self.spbx_screen_y.value(),
+                self.spbx_screen_w.value(),
+                self.spbx_screen_h.value(),
+            )
             self._render_process = multiprocessing.Process(
                 target=run_render,
-                args=(env_class, solution_dir, mode, self._render_queue),
-
+                args=(env_class, solution_dir, mode, self._render_queue, screen_pos),
             )
             self._render_process.start()
             btn.setText("Stop")
@@ -434,14 +437,6 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         offset_x = client_left - win_left
         offset_y = client_top - win_top
         return offset_x, offset_y
-
-
-
-
-
-
-
-
 
     def _start_real_time_preview(self):
         def update_preview():
