@@ -216,12 +216,12 @@ class AvoidStoppedObserver(Env):
         if self.training_queue is not None:
             self.training_queue.put(("done", None))
 
-        # 모델 저장
-        save_path = os.path.join(self.save_dir, "bbf_avoid_observer.pth")
-        agent.save(save_path)
-        print(f"모델 저장 완료: {save_path}")
-        os.system("powercfg -h off")
-        os.system("rundll32.exe powrprof.dll SetSuspendState")
+        # # 모델 저장
+        # save_path = os.path.join(self.save_dir, "bbf_avoid_observer.pth")
+        # agent.save(save_path)
+        # print(f"모델 저장 완료: {save_path}")
+        # os.system("powercfg -h off")
+        # os.system("rundll32.exe powrprof.dll SetSuspendState")
 
     def _test(self, *args, **kwargs):
         last_model_path = None
@@ -258,6 +258,7 @@ class AvoidStoppedObserver(Env):
 
         running = True
         while running:
+            count += 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -298,8 +299,8 @@ class AvoidStoppedObserver(Env):
             # 모델이 제대로 로드되었을 때만 예측 수행
             if model is not None:
                 # 모델 예측
+                state1 = state[0, :3]
                 action = model.predict(state.unsqueeze(0))
-                inputs = state[0, :3]
                 obs, reward, done, info = env.step(action.cpu().item())
                 state = model.preprocess(obs).unsqueeze(0)
                 img = state[0, :3]

@@ -287,9 +287,16 @@ class BBF:
                         for i in range(4):
                             states.append(state)
 
-            save_checkpoint(
-                self.model, self.model_target, f"{save_path}/{name_prefix}.pth"
-            )
+            save_final_path = f"{save_path}/{name_prefix}.tmp"
+            save_checkpoint(self.model, self.model_target, save_final_path)
+            # renaming
+            try:
+                os.replace(
+                    save_final_path,
+                    f"{save_path}/{name_prefix}.pth",
+                )
+            except Exception as e:
+                print(f"[ERROR] 파일 교체 실패: {e}")
 
     def optimize(self, grad_step, n):
         self.model.train()

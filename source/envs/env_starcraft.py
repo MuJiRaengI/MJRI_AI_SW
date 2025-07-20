@@ -24,13 +24,16 @@ class EnvStarcraft(gym.Env):
     def __init__(
         self,
         env_id: str,
+        max_steps: int = 1000,
         scale_factor: float = 0.25,
         frame_stack: int = 4,
     ):
         super().__init__()
         self.env_id = env_id
+        self.max_steps = max_steps
         self.scale_factor = scale_factor
         self.frame_stack = frame_stack
+        self.action_space = spaces.Discrete(8)
         self.max_buffer_size = None
         if self.env_id == "StarcraftAvoidObserver-v0":
             self.max_buffer_size = 4
@@ -88,6 +91,7 @@ class EnvStarcraft(gym.Env):
             self.y + 600,
         )
         self.keyboard.set_numbering(self.focus_num)
+        self.keyboard.focus_numbering(str(self.focus_num))
 
         self.steps = 0
         self.total_reward = 0.0
@@ -95,60 +99,20 @@ class EnvStarcraft(gym.Env):
         self.last_action = None
 
         state = self.get_state_tensor()
-        self.state_buffer.extend([state] * 3)
+        self.state_buffer.extend([state] * self.frame_stack)
 
         return self._get_obs()
 
-    def get_state_tensor(self, scene=None):
-        if scene is None:
-            scene = self.capture()
-
-        # crop
-        scene = np.swapaxes(scene, 2, 1)
-        scene = np.swapaxes(scene, 1, 0)
-        scene = scene[
-            :,
-            self.y_crop : self.y_crop + self.h_crop,
-            self.x_crop : self.x_crop + self.w_crop,
-        ]
-
-        return scene
-
-    def get_stacked_state(self):
-        return F.interpolate(
-            torch.concat(torch.tensor(list(self.state_buffer)), dim=0).unsqueeze(0),
-            scale_factor=(self.scale_factor, self.scale_factor),
-            mode="nearest",
-        ).squeeze()
-
-    def _get_image_obs(self):
-        state = self.get_stacked_state()
-        return np.array(state)
-
-    def _get_vector_obs(self, game_scene):
-        return np.array(self.get_direction_one_hot(game_scene))
-
-    def get_direction_one_hot(self, game_scene, minimap):
-        direct_game_scene, direct_minimap = self.transform_direction(
-            game_scene, minimap
-        )
-
-        direct_game_scene = direct_game_scene.to(self.device)
-        direct_minimap = direct_minimap.to(self.device)
-
-        direction = self.direction_ai(direct_game_scene, direct_minimap)
-        return direction
-
-    def _get_obs(self):
+    def get_state_tensor(self, now_scene=None):
         with torch.no_grad():
-            now_scene = self.get_state_tensor()
+            if now_scene is None:
+                now_scene = self.capture()
             game_scene, minimap, _ = self.split_map(now_scene)
             direction = self.get_direction_one_hot(game_scene, minimap)
             direction = direction.argmax().item()  # 0:down, 1:left, 2:right, 3:up
-
-            x_crop, y_crop, w_crop, h_crop = 400, 100, 512, 512
             game_scene_crop = game_scene[
-                y_crop : y_crop + h_crop, x_crop : x_crop + w_crop
+                self.y_crop : self.y_crop + self.h_crop,
+                self.x_crop : self.x_crop + self.w_crop,
             ]
             detect_scene = self.transform_detection(game_scene_crop)
             detect_scene = detect_scene.to(self.device)
@@ -160,24 +124,88 @@ class EnvStarcraft(gym.Env):
             detect = detect * 255
             detect = detect.detach().cpu().numpy().astype(np.uint8)
 
+            # real
+            # bg = detect[0, 0]
+            # observer = detect[0, 1]
+            # char = detect[0, 2]
+
+            # kernel = np.ones((5, 5), np.uint8)
+            # observer = cv2.morphologyEx(observer, cv2.MORPH_OPEN, kernel)
+            # observer = cv2.morphologyEx(observer, cv2.MORPH_CLOSE, kernel, iterations=2)
+            # bg = cv2.morphologyEx(bg, cv2.MORPH_OPEN, kernel, iterations=2)
+
+            # frame = np.zeros((3, bg.shape[0], bg.shape[1]), dtype=np.uint8)
+
+            # frame[0] = bg
+            # frame[1] = observer
+            # frame[2] = char
+
+            # virtual
+            radius = 15
             bg = detect[0, 0]
-            observer = detect[0, 1]
-            char = detect[0, 2]
 
-            kernel = np.ones((5, 5), np.uint8)
-            observer = cv2.morphologyEx(observer, cv2.MORPH_OPEN, kernel)
-            observer = cv2.morphologyEx(observer, cv2.MORPH_CLOSE, kernel, iterations=2)
-            bg = cv2.morphologyEx(bg, cv2.MORPH_OPEN, kernel, iterations=2)
+            observer = np.zeros_like(detect[0, 1])
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+                (detect[0, 1] == 255).astype(np.uint8)
+            )
+            for i in range(1, num_labels):
+                center_x, center_y = int(centroids[i][0]), int(centroids[i][1])
+                cv2.circle(observer, (center_x, center_y), radius, 255, -1)
 
-            frame = np.zeros((bg.shape[0], bg.shape[1], 3), dtype=np.uint8)
+            char = np.zeros_like(detect[0, 2])
+            cv2.circle(char, (self.w_crop // 2, self.h_crop // 2), radius, 255, -1)
+            # ys, xs = np.where(detect[0, 2] == 255)
+            # if len(xs) > 0 and len(ys) > 0:
+            #     center_x = int(xs.mean())
+            #     center_y = int(ys.mean())
+            #     cv2.circle(char, (center_x, center_y), radius, 255, -1)
 
-            frame[:, :, 2] = bg
-            frame[:, :, 1] = observer
-            frame[:, :, 0] = char
+            frame = np.zeros((3, bg.shape[0], bg.shape[1]), dtype=np.uint8)
+            frame[0] = bg
+            frame[1] = observer
+            frame[2] = char
 
-        # obs 생성
-        image_obs = self._get_image_obs()
-        vector_obs = self._get_vector_obs()
+        frame = torch.from_numpy(frame)
+        return frame
+
+    def get_stacked_state(self):
+        return F.interpolate(
+            torch.concat(list(self.state_buffer), dim=0).unsqueeze(0),
+            scale_factor=(self.scale_factor, self.scale_factor),
+            mode="nearest",
+        ).squeeze()
+
+    def _get_image_obs(self):
+        state = self.get_stacked_state()
+        return np.array(state)
+
+    def _get_vector_obs(self):
+        return np.array(self.get_direction_one_hot())
+
+    def get_direction_one_hot(self, game_scene=None, minimap=None):
+        if game_scene is None or minimap is None:
+            now_scene = self.capture()
+            game_scene, minimap, _ = self.split_map(now_scene)
+        direct_game_scene, direct_minimap = self.transform_direction(
+            game_scene, minimap
+        )
+
+        direct_game_scene = direct_game_scene.to(self.device)
+        direct_minimap = direct_minimap.to(self.device)
+
+        direction = self.direction_ai(direct_game_scene, direct_minimap)
+        direction = direction.argmax().item()  # 0:down, 1:left, 2:right, 3:up
+
+        vector = np.zeros((4,), dtype=np.float32)
+        vector[direction] = 1.0  # one-hot encoding for direction
+
+        return vector
+
+    def _get_obs(self):
+        with torch.no_grad():
+            # obs 생성
+            image_obs = self._get_image_obs()
+            vector_obs = self._get_vector_obs()
         obs = {
             "image": np.array(image_obs, dtype=np.uint8),
             "vector": np.array(vector_obs, dtype=np.float32),
@@ -207,32 +235,44 @@ class EnvStarcraft(gym.Env):
         self.screen.set_screen_pos(x, y, w, h)
         self.ready = True
 
-    def calc_reward(self, action: int, state):
+    def calc_reward(self, action: int, now_scene: np.ndarray):
+        done = False
+        game_scene, minimap, unit_info = self.split_map(now_scene)
+        unit_die = self.unit_die(unit_info)
+        unit_reset = self.unit_reset(game_scene)
 
-        # goal
-        # return 1.0
+        # unit die
+        if unit_die or unit_reset:
+            time.sleep(2)
+            # check goal
+            if self.check_goal(game_scene):
+                return 1.0, True
 
-        # die
-        # return -0.5
+            return -0.5, True
 
         direction = np.array(self.get_direction_one_hot()).argmax()
         degree = [np.pi / 4 * i for i in range(8)]
         reward = np.cos(degree[direction * 2] - degree[action]) * 0.1
 
-        return reward
+        if self.steps >= self.max_steps:
+            done = True
+        return reward, done
 
     def step(self, action: int):
-        self.unit_move_with_angle(action * 45, 150)
+        self.last_action = action
+        if not hasattr(self, "total_reward"):
+            self.total_reward = 0.0
 
-        state = self.capture()
+        self.unit_move_with_angle(action * 45, 300)
+        # time.sleep(0.1)
 
-        self.reward = self.calc_reward(action, state)
+        now_scene = self.capture()
+        state = self.get_state_tensor(now_scene)
+        self.state_buffer.append(state)
+
+        self.reward, done = self.calc_reward(action, now_scene)
         self.total_reward += self.reward
         self.steps += 1
-
-        # 종료조건
-
-        self.state_buffer.append(state)
 
         return self._get_obs(), self.reward, done, {}
 
@@ -262,6 +302,48 @@ class EnvStarcraft(gym.Env):
 
     def render(self, mode="human"):
         pass
+
+    def check_goal(self, frame):
+        crop_frame = frame[
+            self.y_crop : self.y_crop + self.h_crop,
+            self.x_crop : self.x_crop + self.w_crop,
+        ]
+
+        scout_template_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\source\envs\starcraft\template\scout"
+        templates = os.listdir(scout_template_path)
+
+        for template in templates:
+            template_path = os.path.join(scout_template_path, template)
+            template_img = cv2.imread(template_path)
+            res = cv2.matchTemplate(crop_frame, template_img, cv2.TM_CCOEFF_NORMED)
+            threshold = 0.8
+            loc = np.where(res >= threshold)
+
+            if len(loc[0]) > 0:
+                return True
+
+        return False
+
+    def unit_die(self, unit_info):
+        g = unit_info[..., 1]
+        green_count = (g > 200).sum()
+        return green_count < 500
+
+    def unit_reset(self, frame):
+        y_center = self.y_crop + self.h_crop // 2
+        x_center = self.x_crop + self.w_crop // 2
+        margin = 128
+        crop_frame = frame[
+            y_center - margin : y_center + margin,
+            x_center - margin : x_center + margin,
+        ]
+        b, g, r = cv2.split(crop_frame)
+        # mask = (r >= 100) & (b <= 20) & (g <= 20)
+        # r > b + g + 20
+        mask = r.astype(np.float32) > np.clip(
+            b.astype(np.float32) + g.astype(np.float32) + 30, 0, 255
+        )
+        return mask.sum() < 100
 
     def crop_game_screen(self, scene):
         return scene[35:650, 3:-3]
