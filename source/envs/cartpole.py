@@ -5,7 +5,9 @@ sys.path.append(os.path.abspath("."))
 
 import re
 import time
-import gym
+
+# import gym
+import gymnasium as gym
 import pygame
 import keyboard
 from stable_baselines3 import PPO
@@ -20,6 +22,9 @@ class CartPole(Env):
         self.env_id = "CartPole-v1"
         self.total_timesteps = 1000000
         self.n_envs = 8
+
+        self.save_freq = 5000
+        self.logging_freq = 1000
 
     def key_info(self) -> str:
         return "[조작법] A: 왼쪽, D: 오른쪽\n"
@@ -109,8 +114,8 @@ class CartPole(Env):
             self.training_queue.put(("total_steps", self.total_timesteps))
 
         callback = SaveOnStepCallback(
-            save_freq=10000,
-            logging_freq=10000,
+            save_freq=self.save_freq,
+            logging_freq=self.logging_freq,
             save_dir=self.save_dir,
             name_prefix="ppo_cartpole",
             log_dir=log_dir,
@@ -147,7 +152,7 @@ class CartPole(Env):
                 max_steps = -1
                 max_steps_path = None
                 for fname in os.listdir(self.save_dir):
-                    match = re.match(r"ppo_cartpole_(\d+)_steps.zip", fname)
+                    match = re.match(r"ppo_cartpole_best_(\d+)_([-\d\.]+)\.zip", fname)
                     if match:
                         steps = int(match.group(1))
                         if steps > max_steps:

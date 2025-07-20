@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 import numpy as np
 
-
+# fmt: off
 class MLP(nn.Module):
     def __init__(self, in_hiddens=512, med_hiddens=512, out_hiddens=512, layers=1,
                   act=nn.ReLU(), out_act=nn.Identity(), bias=True):

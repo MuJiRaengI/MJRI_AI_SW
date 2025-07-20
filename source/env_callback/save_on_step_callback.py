@@ -72,10 +72,10 @@ class SaveOnStepCallback(BaseCallback):
         match = re.search(r"_(\d+)_steps\.zip", fname)
         return int(match.group(1)) if match else -1
 
-    def extract_reward(self, fname: str) -> int:
-        """파일명에서 보상 값을 추출 (음수 보상도 포함)"""
-        match = re.search(r"_best_\d+_(-?\d+)\.zip", fname)
-        return int(match.group(1)) if match else None
+    def extract_reward(self, fname: str) -> float:
+        """파일명에서 보상 값을 추출 (음수, 소수점 포함)"""
+        match = re.search(r"_best_\d+_(-?\d+\.\d+)\.zip", fname)
+        return float(match.group(1)) if match else None
 
     def cleanup_old_best_models(self):
         """가장 성능이 낮은 best 모델들을 삭제하여 최대 개수 유지"""
@@ -149,9 +149,10 @@ class SaveOnStepCallback(BaseCallback):
             if ep_rew_mean > self.best_mean_reward:
                 self.best_mean_reward = ep_rew_mean
                 gc.collect()
+                # 소수점 3자리까지 파일명에 저장
                 model_path = os.path.join(
                     self.save_dir,
-                    f"{self.name_prefix}_best_{int(self.num_timesteps)}_{int(ep_rew_mean)}.zip",
+                    f"{self.name_prefix}_best_{int(self.num_timesteps)}_{ep_rew_mean:.3f}.zip",
                 )
                 tmp_path = model_path.replace("zip", "tmp")
                 with torch.no_grad():
@@ -161,7 +162,7 @@ class SaveOnStepCallback(BaseCallback):
                 except Exception as e:
                     print(f"[ERROR] 파일 교체 실패: {e}")
                 print(
-                    f"[BEST] New best model saved: {model_path} (ep_rew_mean={ep_rew_mean:.2f})"
+                    f"[BEST] New best model saved: {model_path} (ep_rew_mean={ep_rew_mean:.3f})"
                 )
 
                 # 이전 best 모델들 정리 (상위 5개만 유지)
