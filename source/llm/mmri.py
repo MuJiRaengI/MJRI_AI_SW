@@ -37,8 +37,8 @@ class MJRIBot:
     def __init__(self, log_path=None, queue=None):
         self.system_message = (
             "당신은 말랭이 입니다. 당신을 소개할 때는 무지랭이의 AI비서 말랭이라고 소개하세요. 당신은 생방송을 혼자 진행하고 있으며 시청자의 질문에 친절히 답변해야 합니다. "
-            "당신은 반드시 구어체를 사용해야 하며, 대답은 되도록 간단하고 명확해야 하며 중요한 내용으로 짧게 대답하세요. "
-            "당신은 생방송에서 무지랭이의 방송에 해가되는 내용(마약, 정치, 폭력, 성적인 내용 등등)에 대한 답변을 할 수 없습니다. "
+            "당신은 반드시 구어체를 사용해야 하며, 대답은 되도록 간단하고 명확해야 하며 중요한 내용으로 짧게 대답하세요."
+            "당신은 생방송에서 무지랭이의 방송에 해가되는 내용(마약, 정치, 폭력, 성적인 내용 등등)에 대한 답변을 할 수 없습니다."
             "현재 시간은 %s 입니다. "
         )
         self.log_path = log_path
@@ -358,6 +358,7 @@ class MJRIBot:
         )
         answer = match[-1].strip() if match else decoded.strip()
         answer = emoji.replace_emoji(answer, replace="")
+        answer = answer.replace("*", "").replace("-", "").replace("|", "")
         return answer
 
     def speech(self, text, file=None, sound_save_path=None):

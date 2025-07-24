@@ -53,6 +53,8 @@ class EnvAvoidObserver(gym.Env):
         self.observer_speed = 10
         self.observer_pause_frames = 30  # 1초 대기 (30fps 기준)
 
+        self.obstacle_radius = 48.0  # 충돌 반경
+
         obs_dim = 2 + 2 * num_observers
         # observation_space를 Dict로 정의
         self.observation_space = spaces.Dict(
@@ -270,7 +272,7 @@ class EnvAvoidObserver(gym.Env):
         if self._is_goal(pos):
             return 1.0
         elif self._is_obstacle(pos) or self._check_collision():
-            return -0.5
+            return -1.0
 
         direction = np.array(self.get_direction_one_hot()).argmax()
         degree = [np.pi / 4 * i for i in range(8)]
@@ -387,7 +389,8 @@ class EnvAvoidObserver(gym.Env):
         if self._is_safe(self.agent_pos):
             return False
         return any(
-            np.linalg.norm(self.agent_pos - obs) < 32.0 for obs in self.observers
+            np.linalg.norm(self.agent_pos - obs) < self.obstacle_radius
+            for obs in self.observers
         )
 
     def _get_obs(self):

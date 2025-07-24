@@ -33,7 +33,7 @@ class StarcraftAvoidObserver(Env):
         super().__init__()
         self.env_id = "StarcraftAvoidObserver-v0"
         self.agent = None
-        self.total_timesteps = 100
+        self.total_timesteps = 100000
         self.save_freq = 10000
         self.logging_freq = 1000
         self.feature_dim = 256
@@ -67,13 +67,8 @@ class StarcraftAvoidObserver(Env):
         detect_ai.eval()
         print(f"load object detection model ({detect_ai_path})")
 
-        env = EnvStarcraft(self.env_id)
         screen_pos = kwargs.get("screen_pos", None)
-        if screen_pos is not None:
-            x, y, w, h = screen_pos
-            env.set_screen_pos(x, y, w, h)
-        else:
-            raise ValueError("screen_pos must be provided for random play.")
+        env = EnvStarcraft(self.env_id, screen_pos=screen_pos)
 
         obs = env.reset()
         pygame.init()
@@ -191,66 +186,66 @@ class StarcraftAvoidObserver(Env):
             self.render_queue.put(("done", None))
 
     def _train(self, *args, **kwargs):
-        # log_dir = os.path.join(self.save_dir, self.log_dir)
-        # if not os.path.exists(log_dir):
-        #     os.makedirs(log_dir, exist_ok=True)
+        log_dir = os.path.join(self.save_dir, self.log_dir)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
 
-        # env = EnvStarcraft(self.env_id, self.max_step_length)
-        # screen_pos = kwargs.get("screen_pos", None)
-        # if screen_pos is not None:
-        #     x, y, w, h = screen_pos
-        #     env.set_screen_pos(x, y, w, h)
-        # else:
-        #     raise ValueError("screen_pos must be provided for random play.")
+        env = EnvStarcraft(self.env_id, self.max_step_length)
+        screen_pos = kwargs.get("screen_pos", None)
+        if screen_pos is not None:
+            x, y, w, h = screen_pos
+            env.set_screen_pos(x, y, w, h)
+        else:
+            raise ValueError("screen_pos must be provided for random play.")
 
-        # n_actions = env.action_space.n
+        n_actions = env.action_space.n
 
-        # # 진행상황 전달
-        # if self.training_queue is not None:
-        #     self.training_queue.put(("total_steps", self.total_timesteps))
+        # 진행상황 전달
+        if self.training_queue is not None:
+            self.training_queue.put(("total_steps", self.total_timesteps))
 
-        # model = BBF_Model(
-        #     n_actions,  # env action space size
-        #     hiddens=2048,  # representation dim
-        #     scale_width=4,  # cnn channel scale
-        #     num_buckets=51,  # buckets in distributional RL
-        #     Vmin=-2,  # min value in distributional RL
-        #     Vmax=10,  # max value in distributional RL
-        #     resize=(80, 80),  # input resize
-        # ).cuda()
+        model = BBF_Model(
+            n_actions,  # env action space size
+            hiddens=2048,  # representation dim
+            scale_width=4,  # cnn channel scale
+            num_buckets=51,  # buckets in distributional RL
+            Vmin=-2,  # min value in distributional RL
+            Vmax=30,  # max value in distributional RL
+            resize=(80, 80),  # input resize
+        ).cuda()
 
-        # agent = BBF(
-        #     model,
-        #     env,
-        #     learning_rate=1e-4,
-        #     batch_size=32,
-        #     ema_decay=0.995,  # target model ema decay
-        #     initial_gamma=0.97,  # starting gamma
-        #     final_gamma=0.997,  # final gamma
-        #     initial_n=10,  # starting n-step
-        #     final_n=3,  # final n-step
-        #     num_buckets=51,  # buckets in distributional RL
-        #     reset_freq=40000,  # reset schedule in grad step
-        #     replay_ratio=2,  # update number in one step
-        #     weight_decay=0.1,  # weight decay in optimizer,
-        #     epsilon=0,
-        #     gym_env=True,
-        #     stackFrame=False,
-        # )
+        agent = BBF(
+            model,
+            env,
+            learning_rate=1e-4,
+            batch_size=32,
+            ema_decay=0.995,  # target model ema decay
+            initial_gamma=0.97,  # starting gamma
+            final_gamma=0.997,  # final gamma
+            initial_n=10,  # starting n-step
+            final_n=3,  # final n-step
+            num_buckets=51,  # buckets in distributional RL
+            reset_freq=40000,  # reset schedule in grad step
+            replay_ratio=2,  # update number in one step
+            weight_decay=0.1,  # weight decay in optimizer,
+            epsilon=0,
+            gym_env=True,
+            stackFrame=False,
+        )
 
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_avoid_observer_100000_steps.pth"
-        # if os.path.exists(model_path):
-        #     print(f"기존 모델을 불러옵니다: {model_path}")
-        #     agent.load(model_path)
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Starcraft_avoid_observer\bbf_avoid_observer_190000_steps.pth"
+        if os.path.exists(model_path):
+            print(f"기존 모델을 불러옵니다: {model_path}")
+            agent.load(model_path)
 
-        # env.start_focusing()
-        # agent.learn(
-        #     total_timesteps=self.total_timesteps,
-        #     save_freq=self.save_freq,
-        #     save_path=self.save_dir,
-        #     name_prefix="bbf_avoid_observer",  # save file name prefix
-        # )
-        # env.stop_focusing()
+        env.start_focusing()
+        agent.learn(
+            total_timesteps=self.total_timesteps,
+            save_freq=self.save_freq,
+            save_path=self.save_dir,
+            name_prefix="bbf_avoid_observer",  # save file name prefix
+        )
+        env.stop_focusing()
 
         if self.render_queue is not None:
             self.render_queue.put(("done", None))
@@ -260,13 +255,8 @@ class StarcraftAvoidObserver(Env):
         model = None
         count = 0
 
-        env = EnvStarcraft(self.env_id)
         screen_pos = kwargs.get("screen_pos", None)
-        if screen_pos is not None:
-            x, y, w, h = screen_pos
-            env.set_screen_pos(x, y, w, h)
-        else:
-            raise ValueError("screen_pos must be provided for random play.")
+        env = EnvStarcraft(self.env_id, screen_pos=screen_pos)
 
         n_actions = env.action_space.n
         obs = env.reset()
@@ -280,7 +270,6 @@ class StarcraftAvoidObserver(Env):
         self.running = True
         env.start_focusing()
         while self.running:
-            print(self.running)
             count += 1
             if self.render_queue is not None and not self.render_queue.empty():
                 msg = self.render_queue.get()
@@ -315,14 +304,14 @@ class StarcraftAvoidObserver(Env):
             # 모델이 제대로 로드되었을 때만 예측 수행
             if model is not None:
                 # 모델 예측
-                state1 = state[0, :3]
-                state2 = state[0, 3:6]
-                state3 = state[0, 6:9]
-                state4 = state[0, 9:12]
+                r_state1 = state[0, :3]
+                r_state2 = state[0, 3:6]
+                r_state3 = state[0, 6:9]
+                r_state4 = state[0, 9:12]
+                r_state5 = state[0, 12:15]
 
-                # print(f"count: {count}")
-                # if count > 10:
-                # print(f"count: {count}")
+                # if count > 30:
+                #     print("")
                 action = model.predict(state.unsqueeze(0))
                 obs, reward, done, info = env.step(action.cpu().item())
                 # print(f"Reward: {round(reward, 2)}", end="\r", flush=True)

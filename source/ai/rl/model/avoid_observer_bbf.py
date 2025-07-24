@@ -73,8 +73,8 @@ class BBF_Model(nn.Module):
         self.direction_encoder = nn.Linear(4, 400)
     
         # Single layer dense that maps the flattened encoded representation into hiddens.
-        self.projection = MLP(12800+400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
-        self.trans_projection = MLP(12800, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        self.projection = MLP(3200*scale_width+400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        self.trans_projection = MLP(3200*scale_width, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
         self.prediction = MLP(hiddens, out_hiddens=hiddens, layers=1)
                                               
         self.transition = nn.Sequential(DQN_Conv(32*scale_width+n_actions, 32*scale_width, 3, 1, 1, norm=False, act=self.act),

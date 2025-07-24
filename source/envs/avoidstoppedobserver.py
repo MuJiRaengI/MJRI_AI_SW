@@ -25,7 +25,7 @@ class AvoidStoppedObserver(Env):
     def __init__(self):
         super().__init__()
         self.env_id = "FindAvoidObserver-v1"
-        self.total_timesteps = 100000
+        self.total_timesteps = 200000
         self.save_freq = 10000
         self.logging_freq = 1000
         self.feature_dim = 256
@@ -174,10 +174,10 @@ class AvoidStoppedObserver(Env):
         model = BBF_Model(
             n_actions,  # env action space size
             hiddens=2048,  # representation dim
-            scale_width=4,  # cnn channel scale
+            scale_width=8,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=10,  # max value in distributional RL
+            Vmax=100,  # max value in distributional RL
             resize=(80, 80),  # input resize
         ).cuda()
 
@@ -200,7 +200,7 @@ class AvoidStoppedObserver(Env):
             stackFrame=False,
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction\bbf_avoid_observer_50000_steps.pth"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction6\bbf_avoid_observer_110000_steps.pth"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)
@@ -240,7 +240,15 @@ class AvoidStoppedObserver(Env):
         n_actions = env.action_space.n
         obs = env.reset()
 
-        model = BBF_Model(n_actions, resize=(80, 80)).cuda()  # input resize
+        model = BBF_Model(
+            n_actions,  # env action space size
+            hiddens=2048,  # representation dim
+            scale_width=8,  # cnn channel scale
+            num_buckets=51,  # buckets in distributional RL
+            Vmin=-2,  # min value in distributional RL
+            Vmax=100,  # max value in distributional RL
+            resize=(80, 80),  # input resize
+        ).cuda()  # input resize
         state = model.preprocess(obs).unsqueeze(0)
 
         # 초기 렌더링을 위해 단일 환경에 접근
@@ -258,7 +266,6 @@ class AvoidStoppedObserver(Env):
 
         running = True
         while running:
-            count += 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -300,10 +307,14 @@ class AvoidStoppedObserver(Env):
             if model is not None:
                 # 모델 예측
                 state1 = state[0, :3]
+                state2 = state[0, 3:6]
+                state3 = state[0, 6:9]
+                state4 = state[0, 9:12]
+                state5 = state[0, 12:15]
+
                 action = model.predict(state.unsqueeze(0))
                 obs, reward, done, info = env.step(action.cpu().item())
                 state = model.preprocess(obs).unsqueeze(0)
-                img = state[0, :3]
                 single_env.render()
 
                 if done:

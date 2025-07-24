@@ -4,7 +4,6 @@ import gymnasium as gym
 # from gym import spaces
 import gymnasium.spaces as spaces
 import numpy as np
-import pygame
 import torch
 from PIL import Image
 from collections import deque
@@ -27,16 +26,22 @@ class EnvStarcraft(gym.Env):
         max_steps: int = 1000,
         scale_factor: float = 0.25,
         frame_stack: int = 4,
+        fps=30,
+        screen_pos: tuple = None,
     ):
         super().__init__()
         self.env_id = env_id
         self.max_steps = max_steps
         self.scale_factor = scale_factor
         self.frame_stack = frame_stack
+        self.screen_pos = screen_pos
+        self.fps = fps
         self.action_space = spaces.Discrete(8)
         self.max_buffer_size = None
         if self.env_id == "StarcraftAvoidObserver-v0":
             self.max_buffer_size = 4
+
+        self.ready = False
 
         self.focus_num = 1
         self.focus_thread = None
@@ -44,14 +49,21 @@ class EnvStarcraft(gym.Env):
 
         self.keyboard = MJRIKeyboard()
         self.mouse = MJRIMouse()
-        self.screen = MJRIScreen(self.max_buffer_size)
+        self.screen = MJRIScreen(self.max_buffer_size, thread_run=True, fps=fps)
+        self.screen.set_buffer(self.max_buffer_size)
 
         self.x = 0
         self.y = 0
         self.w = 0
         self.h = 0
+
+        if screen_pos is not None:
+            x, y, w, h = screen_pos
+            self.set_screen_pos(x, y, w, h)
+
+        self.x_crop, self.y_crop, self.w_crop, self.h_crop = 400, 100, 512, 512
+
         self.char_h_margin = -90
-        self.ready = False
 
         self.steps = 0
         self.total_reward = 0.0
@@ -74,8 +86,17 @@ class EnvStarcraft(gym.Env):
         self.detect_ai.eval()
         print(f"load object detection model ({self.detect_ai_path})")
 
-        self.state_buffer = deque(maxlen=self.frame_stack)
-        self.x_crop, self.y_crop, self.w_crop, self.h_crop = 400, 100, 512, 512
+        for i in range(self.max_buffer_size):
+            self.screen.capture()
+            time.sleep(0.1)  # wait for the screen to capture
+
+        self.get_stacked_state()
+
+    def __del__(self):
+        if self.focus_thread is not None:
+            self.focus_flag = False
+            self.focus_thread.join()
+        self.screen.stop()
 
     def reset(self, *args, **kwargs):
         if not self.ready:
@@ -97,9 +118,6 @@ class EnvStarcraft(gym.Env):
         self.total_reward = 0.0
         self.reward = 0.0
         self.last_action = None
-
-        state = self.get_state_tensor()
-        self.state_buffer.extend([state] * self.frame_stack)
 
         return self._get_obs()
 
@@ -169,22 +187,75 @@ class EnvStarcraft(gym.Env):
         return frame
 
     def get_stacked_state(self):
-        return F.interpolate(
-            torch.concat(list(self.state_buffer), dim=0).unsqueeze(0),
-            scale_factor=(self.scale_factor, self.scale_factor),
-            mode="nearest",
-        ).squeeze()
+        stacked_frame = self.screen.screenshot_buffer
+        # stacked_frame = np.concat(stacked_frame, axis=-1)
+        stacked_frame = np.stack(stacked_frame, axis=3)
+        stacked_game_scene, _, _ = self.split_map(stacked_frame)
+        # crop
+        stacked_game_scene = stacked_game_scene[
+            self.y_crop : self.y_crop + self.h_crop,
+            self.x_crop : self.x_crop + self.w_crop,
+        ]
+        stacked_game_scene = torch.from_numpy(stacked_game_scene).permute(3, 2, 0, 1)
+        # stacked_frame_resize = F.interpolate(
+        #     stacked_game_scene,
+        #     scale_factor=(self.scale_factor, self.scale_factor),
+        #     mode="nearest",
+        # ).squeeze()
+        return stacked_game_scene
 
     def _get_image_obs(self):
         state = self.get_stacked_state()
-        return np.array(state)
+
+        with torch.no_grad():
+            detect_scene = self.transform_detection(state)
+            detect_scene = detect_scene.to(self.device)
+            detect = self.detect_ai(detect_scene)
+
+            threshold = 0.99
+            detect = detect > threshold
+            detect = detect * 255
+            detect = detect.detach().cpu().numpy().astype(np.uint8)
+
+            radius = 17
+            frames = np.zeros(
+                (3 * detect.shape[0], detect.shape[2], detect.shape[3]), dtype=np.uint8
+            )
+            char = np.zeros_like(detect[0, 2])
+            cv2.circle(char, (self.w_crop // 2, self.h_crop // 2), radius, 255, -1)
+
+            for idx in range(detect.shape[0]):
+                frame = np.zeros((3, detect.shape[2], detect.shape[3]), dtype=np.uint8)
+
+                bg = detect[idx, 0]
+                observer = np.zeros_like(detect[idx, 1])
+                num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+                    (detect[idx, 1] == 255).astype(np.uint8)
+                )
+                for i in range(1, num_labels):
+                    center_x, center_y = int(centroids[i][0]), int(centroids[i][1])
+                    cv2.circle(observer, (center_x, center_y), radius, 255, -1)
+
+                frame[0] = bg
+                frame[1] = observer
+                frame[2] = char
+
+                frames[idx * 3 : (idx + 1) * 3] = frame
+
+        frames = torch.from_numpy(frames)
+        frames = F.interpolate(
+            frames.unsqueeze(0),
+            scale_factor=(self.scale_factor, self.scale_factor),
+            mode="nearest",
+        ).squeeze()
+        return frames
 
     def _get_vector_obs(self):
         return np.array(self.get_direction_one_hot())
 
     def get_direction_one_hot(self, game_scene=None, minimap=None):
         if game_scene is None or minimap is None:
-            now_scene = self.capture()
+            now_scene = self.screen.screenshot_buffer[-1]
             game_scene, minimap, _ = self.split_map(now_scene)
         direct_game_scene, direct_minimap = self.transform_direction(
             game_scene, minimap
@@ -197,7 +268,14 @@ class EnvStarcraft(gym.Env):
         direction = direction.argmax().item()  # 0:down, 1:left, 2:right, 3:up
 
         vector = np.zeros((4,), dtype=np.float32)
-        vector[direction] = 1.0  # one-hot encoding for direction
+        if direction == 0:  # down
+            vector[1] = 1.0
+        elif direction == 1:  # left
+            vector[2] = 1.0
+        elif direction == 2:  # right
+            vector[0] = 1.0
+        elif direction == 3:  # up
+            vector[3] = 1.0
 
         return vector
 
@@ -248,6 +326,7 @@ class EnvStarcraft(gym.Env):
             if self.check_goal(game_scene):
                 return 1.0, True
 
+            self.keyboard.press_and_release("s", delay=0.1)
             return -0.5, True
 
         direction = np.array(self.get_direction_one_hot()).argmax()
@@ -266,9 +345,8 @@ class EnvStarcraft(gym.Env):
         self.unit_move_with_angle(action * 45, 300)
         # time.sleep(0.1)
 
-        now_scene = self.capture()
-        state = self.get_state_tensor(now_scene)
-        self.state_buffer.append(state)
+        # now_scene = self.capture()
+        now_scene = self.screen.screenshot_buffer[-1]
 
         self.reward, done = self.calc_reward(action, now_scene)
         self.total_reward += self.reward
@@ -297,7 +375,7 @@ class EnvStarcraft(gym.Env):
         target_x = char_x + dx
         target_y = char_y + dy
 
-        self.mouse.rightClick(target_x, target_y, delay=0.1)
+        self.mouse.rightClick(target_x, target_y, delay=0.005)
         return
 
     def render(self, mode="human"):
@@ -332,7 +410,7 @@ class EnvStarcraft(gym.Env):
     def unit_reset(self, frame):
         y_center = self.y_crop + self.h_crop // 2
         x_center = self.x_crop + self.w_crop // 2
-        margin = 128
+        margin = 256
         crop_frame = frame[
             y_center - margin : y_center + margin,
             x_center - margin : x_center + margin,
@@ -379,9 +457,12 @@ class EnvStarcraft(gym.Env):
         return game_scene.unsqueeze(0), minimap.unsqueeze(0)
 
     def transform_detection(self, scene):
-        scene = torch.from_numpy(scene).permute(2, 0, 1).float()
-        scene = scene / 255.0
-        return scene.unsqueeze(0)
+        if isinstance(scene, np.ndarray):
+            scene = torch.from_numpy(scene).permute(2, 0, 1)
+        scene = scene.float() / 255.0
+        if scene.dim() == 3:
+            scene = scene.unsqueeze(0)
+        return scene
 
 
 if __name__ == "__main__":
