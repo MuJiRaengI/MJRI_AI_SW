@@ -15,6 +15,7 @@ from .experience_replay import *
 from .utils import *
 
 import locale
+import keyboard
 
 locale.getpreferredencoding = lambda: "UTF-8"
 
@@ -24,6 +25,7 @@ class BBF:
         self,
         model,
         env,
+        memory_size=50000,
         learning_rate=1e-4,
         batch_size=32,
         ema_decay=0.995,
@@ -38,11 +40,13 @@ class BBF:
         epsilon=0,
         gym_env=False,
         stackFrame=True,
+        real_env=False,
     ):
 
         self.model = model
         self.model_target = copy.deepcopy(model)
         self.env = env
+        self.memory_size = memory_size
         self.n_actions = env.action_space.n
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -60,6 +64,13 @@ class BBF:
         self.transforms = transforms.Compose([transforms.Resize((96, 72))])
         self.gym_env = gym_env
         self.stackFrame = stackFrame
+        self.real_env = real_env
+        self.running = True
+        keyboard.add_hotkey("ctrl+p", self.stop_running)
+        keyboard.add_hotkey("f4", self.stop_running)
+
+    def stop_running(self):
+        self.running = False
 
     def learn(
         self,
@@ -96,7 +107,7 @@ class BBF:
             eps=1.5e-4,
         )
 
-        self.memory = PrioritizedReplay_nSteps_Sqrt(total_timesteps + 5)
+        self.memory = PrioritizedReplay_nSteps_Sqrt(self.memory_size)
         self.memory.free()
 
         scores = []
@@ -105,198 +116,218 @@ class BBF:
 
         progress_bar = tqdm.tqdm(total=total_timesteps)
 
-        while step < (10):
-            if self.gym_env:
-                state = self.env.reset()
-            else:
-                state, info = self.env.reset()
-            state = self.model.preprocess(state).unsqueeze(0)
+        if self.gym_env:
+            state = self.env.reset()
+        else:
+            state, info = self.env.reset()
+        state = self.model.preprocess(state).unsqueeze(0)
+
+        if self.stackFrame:
+            states = deque(maxlen=4)
+            for i in range(4):
+                states.append(state)
+
+        eps_reward = torch.tensor([0], dtype=torch.float)
+
+        reward = np.array([0])
+        done_flag = np.array([False])
+        terminated = np.array([False])
+
+        last_lives = np.array([0])
+        life_loss = np.array([0])
+        resetted = np.array([0])
+
+        last_grad_update = 0
+        episode_steps = 0
+        while step < total_timesteps:
+            if not self.running:
+                break
+            # print(f"step {step}, grad_step {grad_step}")
+            episode_steps += 1
+            progress_bar.update(1)
+            self.model_target.train()
+
+            # len_memory = len(self.memory)
+
+            # if resetted[0]>0:
+            #    states = env.noop_steps(states)
 
             if self.stackFrame:
-                states = deque(maxlen=4)
-                for i in range(4):
-                    states.append(state)
+                Q_action = self.model_target.env_step(
+                    torch.cat(list(states), -3).unsqueeze(0)
+                )
+            else:
+                Q_action = self.model_target.env_step(state.unsqueeze(0))
 
-            eps_reward = torch.tensor([0], dtype=torch.float)
+            action = epsilon_greedy(
+                Q_action, self.n_actions, len(self.memory), self.epsilon
+            ).cpu()
 
-            reward = np.array([0])
-            done_flag = np.array([False])
-            terminated = np.array([False])
+            if self.stackFrame:
+                self.memory.push(
+                    torch.cat(list(states), -3).detach().cpu(),
+                    torch.tensor(reward, dtype=torch.float),
+                    action,
+                    torch.tensor(np.logical_or(done_flag, life_loss), dtype=torch.bool),
+                )
+            else:
+                self.memory.push(
+                    state.detach().cpu(),
+                    torch.tensor(reward, dtype=torch.float),
+                    action,
+                    torch.tensor(np.logical_or(done_flag, life_loss), dtype=torch.bool),
+                )
+            # print('action', action, action.shape)
 
-            last_lives = np.array([0])
-            life_loss = np.array([0])
-            resetted = np.array([0])
+            len_memory = len(self.memory)
 
-            last_grad_update = 0
-            while step < (total_timesteps):
-                progress_bar.update(1)
-                self.model_target.train()
+            if self.gym_env:
+                state, reward, terminated, info = self.env.step(action.item())
+                truncated = False
+            else:
+                state, reward, terminated, truncated, info = self.env.step(
+                    action.item()
+                )
 
-                len_memory = len(self.memory)
+            state = self.model.preprocess(state).unsqueeze(0)
+            if self.stackFrame:
+                states.append(state)
+            reward = np.array([reward])
+            terminated = np.array([terminated])
+            truncated = np.array([truncated])
 
-                # if resetted[0]>0:
-                #    states = env.noop_steps(states)
+            eps_reward += reward
+            reward = np.clip(reward, -1, 1)
 
-                if self.stackFrame:
-                    Q_action = self.model_target.env_step(
-                        torch.cat(list(states), -3).unsqueeze(0)
+            done_flag = np.logical_or(terminated, truncated)
+            if "lives" in info:
+                lives = np.array([info["lives"]])
+                life_loss = np.clip(last_lives - lives, 0, None)
+                resetted = np.clip(lives - last_lives, 0, None)
+                last_lives = lives
+
+            n = int(
+                self.initial_n
+                * (self.final_n / self.initial_n)
+                ** (min(grad_step, self.schedule_max_step) / self.schedule_max_step)
+            )
+            n = np.array(n).item()
+
+            self.memory.priority[len_memory - 1] = self.memory.max_priority()
+
+            if (
+                not self.real_env
+                and len_memory > self.batch_size
+                and len_memory > self.memory_size // 2
+            ):
+                for i in range(self.replay_ratio):
+                    self.optimize(grad_step, n)
+                    target_model_ema(self.model, self.model_target)
+                    grad_step += 1
+
+            if self.real_env and done_flag:
+                for _ in tqdm.tqdm(range(episode_steps)):
+                    if (
+                        len_memory > self.batch_size
+                        and len_memory > self.memory_size // 2
+                    ):
+                        for i in range(self.replay_ratio):
+                            self.optimize(grad_step, n)
+                            target_model_ema(self.model, self.model_target)
+                            grad_step += 1
+                print(f"Episode finished after {episode_steps} steps")
+                episode_steps = 0
+
+            if save_freq != None and ((step + 1) % save_freq) == 0:
+                save_checkpoint_path = f"{save_path}/{name_prefix}_{step+1}_steps.tmp"
+                save_checkpoint(self.model, self.model_target, save_checkpoint_path)
+                # renaming
+                try:
+                    os.replace(
+                        save_checkpoint_path,
+                        f"{save_path}/{name_prefix}_{step+1}_steps.pth",
                     )
-                else:
-                    Q_action = self.model_target.env_step(state.unsqueeze(0))
-
-                action = epsilon_greedy(
-                    Q_action, self.n_actions, len_memory, self.epsilon
-                ).cpu()
-
-                if self.stackFrame:
-                    self.memory.push(
-                        torch.cat(list(states), -3).detach().cpu(),
-                        torch.tensor(reward, dtype=torch.float),
-                        action,
-                        torch.tensor(
-                            np.logical_or(done_flag, life_loss), dtype=torch.bool
-                        ),
+                    print(
+                        f"[INFO] 모델 체크포인트 저장 완료: {save_path}/{name_prefix}_{step+1}_steps.pth"
                     )
-                else:
-                    self.memory.push(
-                        state.detach().cpu(),
-                        torch.tensor(reward, dtype=torch.float),
-                        action,
-                        torch.tensor(
-                            np.logical_or(done_flag, life_loss), dtype=torch.bool
-                        ),
-                    )
-                # print('action', action, action.shape)
+                except Exception as e:
+                    print(f"[ERROR] 파일 교체 실패: {e}")
 
+            if grad_step > self.reset_freq:
+                # eval()
+                print("Reseting on step", step, grad_step)
+
+                # seed_np_torch(random.randint(SEED-1000, SEED+1000)+step)
+                self.model.hard_reset()
+
+                # seed_np_torch(random.randint(SEED-1000, SEED+1000)+step)
+                self.model_target.hard_reset()
+
+                grad_step = 0
+
+                actor_modules = [
+                    self.model.prediction,
+                    self.model.projection,
+                    self.model.a,
+                    self.model.v,
+                ]
+                params_ac = []
+                for module in actor_modules:
+                    for param in module.parameters():
+                        params_ac.append(param)
+
+                perception_modules = [self.model.encoder_cnn, self.model.transition]
+                params_wm = []
+                for module in perception_modules:
+                    for param in module.parameters():
+                        params_wm.append(param)
+
+                optimizer_aux = torch.optim.AdamW(
+                    params_wm,
+                    lr=self.learning_rate,
+                    weight_decay=self.weight_decay,
+                    eps=1.5e-4,
+                )
+                copy_states(self.optimizer, optimizer_aux)
+                self.optimizer = torch.optim.AdamW(
+                    chain(params_wm, params_ac),
+                    lr=self.learning_rate,
+                    weight_decay=self.weight_decay,
+                    eps=1.5e-4,
+                )
+                copy_states(optimizer_aux, self.optimizer)
+
+            step += 1
+
+            log_t = done_flag.astype(float).nonzero()[0]
+
+            if len(log_t) > 0:
+                for log in log_t:
+                    # print({"eps_reward": eps_reward[log].sum()})
+                    scores.append(eps_reward[log].clone())
+
+                eps_reward[log_t] = 0
                 if self.gym_env:
-                    state, reward, terminated, info = self.env.step(action.item())
-                    truncated = False
+                    state = self.env.reset()
                 else:
-                    state, reward, terminated, truncated, info = self.env.step(
-                        action.item()
-                    )
-
+                    state, info = self.env.reset()
                 state = self.model.preprocess(state).unsqueeze(0)
+
                 if self.stackFrame:
-                    states.append(state)
-                reward = np.array([reward])
-                terminated = np.array([terminated])
-                truncated = np.array([truncated])
+                    states = deque(maxlen=4)
+                    for i in range(4):
+                        states.append(state)
 
-                eps_reward += reward
-                reward = np.clip(reward, -1, 1)
-
-                done_flag = np.logical_or(terminated, truncated)
-                if "lives" in info:
-                    lives = np.array([info["lives"]])
-                    life_loss = np.clip(last_lives - lives, 0, None)
-                    resetted = np.clip(lives - last_lives, 0, None)
-                    last_lives = lives
-
-                n = int(
-                    self.initial_n
-                    * (self.final_n / self.initial_n)
-                    ** (min(grad_step, self.schedule_max_step) / self.schedule_max_step)
-                )
-                n = np.array(n).item()
-
-                self.memory.priority[len_memory] = self.memory.max_priority()
-
-                if len_memory > 2000:
-                    for i in range(self.replay_ratio):
-                        self.optimize(grad_step, n)
-                        target_model_ema(self.model, self.model_target)
-                        grad_step += 1
-
-                if save_freq != None and ((step + 1) % save_freq) == 0:
-                    save_checkpoint_path = (
-                        f"{save_path}/{name_prefix}_{step+1}_steps.tmp"
-                    )
-                    save_checkpoint(self.model, self.model_target, save_checkpoint_path)
-                    # renaming
-                    try:
-                        os.replace(
-                            save_checkpoint_path,
-                            f"{save_path}/{name_prefix}_{step+1}_steps.pth",
-                        )
-                    except Exception as e:
-                        print(f"[ERROR] 파일 교체 실패: {e}")
-
-                if grad_step > self.reset_freq:
-                    # eval()
-                    print("Reseting on step", step, grad_step)
-
-                    # seed_np_torch(random.randint(SEED-1000, SEED+1000)+step)
-                    self.model.hard_reset()
-
-                    # seed_np_torch(random.randint(SEED-1000, SEED+1000)+step)
-                    self.model_target.hard_reset()
-
-                    grad_step = 0
-
-                    actor_modules = [
-                        self.model.prediction,
-                        self.model.projection,
-                        self.model.a,
-                        self.model.v,
-                    ]
-                    params_ac = []
-                    for module in actor_modules:
-                        for param in module.parameters():
-                            params_ac.append(param)
-
-                    perception_modules = [self.model.encoder_cnn, self.model.transition]
-                    params_wm = []
-                    for module in perception_modules:
-                        for param in module.parameters():
-                            params_wm.append(param)
-
-                    optimizer_aux = torch.optim.AdamW(
-                        params_wm,
-                        lr=self.learning_rate,
-                        weight_decay=self.weight_decay,
-                        eps=1.5e-4,
-                    )
-                    copy_states(self.optimizer, optimizer_aux)
-                    self.optimizer = torch.optim.AdamW(
-                        chain(params_wm, params_ac),
-                        lr=self.learning_rate,
-                        weight_decay=self.weight_decay,
-                        eps=1.5e-4,
-                    )
-                    copy_states(optimizer_aux, self.optimizer)
-
-                step += 1
-
-                log_t = done_flag.astype(float).nonzero()[0]
-
-                if len(log_t) > 0:
-                    for log in log_t:
-                        # print({"eps_reward": eps_reward[log].sum()})
-                        scores.append(eps_reward[log].clone())
-
-                    eps_reward[log_t] = 0
-                    if self.gym_env:
-                        state = self.env.reset()
-                    else:
-                        state, info = self.env.reset()
-                    state = self.model.preprocess(state).unsqueeze(0)
-
-                    if self.stackFrame:
-                        states = deque(maxlen=4)
-                        for i in range(4):
-                            states.append(state)
-
-            save_final_path = f"{save_path}/{name_prefix}.tmp"
-            save_checkpoint(self.model, self.model_target, save_final_path)
-            # renaming
-            try:
-                os.replace(
-                    save_final_path,
-                    f"{save_path}/{name_prefix}.pth",
-                )
-            except Exception as e:
-                print(f"[ERROR] 파일 교체 실패: {e}")
+        save_final_path = f"{save_path}/{name_prefix}.tmp"
+        save_checkpoint(self.model, self.model_target, save_final_path)
+        # renaming
+        try:
+            os.replace(
+                save_final_path,
+                f"{save_path}/{name_prefix}.pth",
+            )
+        except Exception as e:
+            print(f"[ERROR] 파일 교체 실패: {e}")
 
     def optimize(self, grad_step, n):
         self.model.train()

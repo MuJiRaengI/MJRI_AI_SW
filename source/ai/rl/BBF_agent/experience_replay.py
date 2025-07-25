@@ -83,7 +83,12 @@ class PrioritizedReplay_nSteps_Sqrt(object):
 
     def prioritize(self, batch_size, seq_len, step):
         with torch.no_grad():
-            max_n = int(self.n - seq_len - 5 - 1)
+            max_n = min(int(self.n - seq_len - 5 - 1), self.capacity)
+            if max_n <= 0:
+                # 샘플링 불가 상황 처리
+                return torch.tensor([], dtype=torch.long), torch.tensor(
+                    [], dtype=torch.float
+                )
 
             priority = self.priority.clone()[:max_n].pow(self.alpha)
             probs = priority / priority.sum()
@@ -102,25 +107,28 @@ class PrioritizedReplay_nSteps_Sqrt(object):
     def sample(self, seq_len, batch_size, step):
 
         states, action, rewards, c_flag, idxs = [], [], [], [], []
-
-        idxs, is_ws = self.prioritize(batch_size, seq_len, step)
-        for idx in idxs:
-            batch = Transition(
-                *zip(
-                    *list(
-                        [
-                            self.memory[int(i + idx)]
-                            for i in range(max(seq_len + 1, 5 + 1))
-                        ]
-                    )
+        tries = 0
+        while len(states) < batch_size:
+            tries += 1
+            if tries > 10:
+                break
+            idxs, is_ws = self.prioritize(batch_size, seq_len, step)
+            traj_len = max(seq_len + 1, 5 + 1)
+            mem_len = len(self.memory)
+            for idx in idxs:
+                if idx + traj_len > mem_len:
+                    # trajectory가 메모리 범위를 넘으면 스킵
+                    continue
+                batch = Transition(
+                    *zip(*list([self.memory[int(i + idx)] for i in range(traj_len)]))
                 )
-            )
 
-            states.append(torch.stack(batch.state).squeeze(1).cuda())
-
-            rewards.append(torch.stack(batch.reward).cuda())
-            action.append(torch.stack(batch.action).cuda())
-            c_flag.append((~torch.stack(batch.c_flag).cuda()).float())
+                states.append(torch.stack(batch.state).squeeze(1).cuda())
+                rewards.append(torch.stack(batch.reward).cuda())
+                action.append(torch.stack(batch.action).cuda())
+                c_flag.append((~torch.stack(batch.c_flag).cuda()).float())
+                if len(states) >= batch_size:
+                    break
 
         states = torch.stack(states)
         next_states = states.clone()

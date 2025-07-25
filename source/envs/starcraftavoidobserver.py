@@ -34,7 +34,7 @@ class StarcraftAvoidObserver(Env):
         self.env_id = "StarcraftAvoidObserver-v0"
         self.agent = None
         self.total_timesteps = 100000
-        self.save_freq = 10000
+        self.save_freq = 3000
         self.logging_freq = 1000
         self.feature_dim = 256
 
@@ -207,16 +207,17 @@ class StarcraftAvoidObserver(Env):
         model = BBF_Model(
             n_actions,  # env action space size
             hiddens=2048,  # representation dim
-            scale_width=4,  # cnn channel scale
+            scale_width=8,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=30,  # max value in distributional RL
+            Vmax=100,  # max value in distributional RL
             resize=(80, 80),  # input resize
         ).cuda()
 
         agent = BBF(
             model,
             env,
+            memory_size=50000,  # replay memory size
             learning_rate=1e-4,
             batch_size=32,
             ema_decay=0.995,  # target model ema decay
@@ -231,9 +232,10 @@ class StarcraftAvoidObserver(Env):
             epsilon=0,
             gym_env=True,
             stackFrame=False,
+            real_env=True,
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Starcraft_avoid_observer\bbf_avoid_observer_190000_steps.pth"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction7\bbf_avoid_observer_130000_steps.pth"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)
@@ -261,7 +263,15 @@ class StarcraftAvoidObserver(Env):
         n_actions = env.action_space.n
         obs = env.reset()
 
-        model = BBF_Model(n_actions, resize=(80, 80)).cuda()  # input resize
+        model = BBF_Model(
+            n_actions,  # env action space size
+            hiddens=2048,  # representation dim
+            scale_width=8,  # cnn channel scale
+            num_buckets=51,  # buckets in distributional RL
+            Vmin=-2,  # min value in distributional RL
+            Vmax=100,  # max value in distributional RL
+            resize=(80, 80),  # input resize
+        ).cuda()  # input resize
         state = model.preprocess(obs).unsqueeze(0)
 
         # 초기 렌더링을 위해 단일 환경에 접근
