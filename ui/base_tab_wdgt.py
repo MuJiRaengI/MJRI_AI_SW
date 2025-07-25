@@ -59,6 +59,10 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self.update_target_window_list()
         if self.solution.target_window:
             idx = self.cbox_target_window.findText(self.solution.target_window)
+            if idx == -1:
+                idx = self.cbox_target_window.findText(
+                    f"(miss) {self.solution.target_window}"
+                )
             if idx != -1:
                 self.cbox_target_window.setCurrentIndex(idx)
 
@@ -148,6 +152,8 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             for item in items:
                 self.cbox_target_window.addItem(item)
             idx = self.cbox_target_window.findText(current_text)
+            if idx == -1 and solution_target:
+                idx = self.cbox_target_window.findText(solution_target)
             if idx != -1:
                 self.cbox_target_window.setCurrentIndex(idx)
             elif missing_target:
