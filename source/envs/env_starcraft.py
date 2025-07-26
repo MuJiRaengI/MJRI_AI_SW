@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import os
 import time
 import threading
+from datetime import datetime
 
 from source.utils.mjri_screen import MJRIScreen
 from source.utils.mjri_keyboard import MJRIKeyboard
@@ -324,6 +325,8 @@ class EnvStarcraft(gym.Env):
             time.sleep(2)
             # check goal
             if self.check_goal(game_scene):
+                now_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                os.mkdir(f"goal_{now_time}")
                 return 1.0, True
 
             self.keyboard.press_and_release("s", delay=0.1)

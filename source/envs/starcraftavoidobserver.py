@@ -217,7 +217,7 @@ class StarcraftAvoidObserver(Env):
         agent = BBF(
             model,
             env,
-            memory_size=50000,  # replay memory size
+            memory_size=30000,  # replay memory size
             learning_rate=1e-4,
             batch_size=32,
             ema_decay=0.995,  # target model ema decay
@@ -235,7 +235,8 @@ class StarcraftAvoidObserver(Env):
             real_env=True,
         )
 
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction7\bbf_avoid_observer_130000_steps.pth"
+        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction7\bbf_avoid_observer_130000_steps.pth"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Starcraft_avoid_observer\backup2\bbf_avoid_observer_51000_steps.pth"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)

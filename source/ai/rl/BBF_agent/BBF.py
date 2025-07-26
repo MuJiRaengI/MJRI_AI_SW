@@ -6,6 +6,7 @@ import os
 from multiprocessing import freeze_support
 
 import numpy as np
+import time
 
 import torch
 import torch.nn.functional as F
@@ -125,7 +126,7 @@ class BBF:
         if self.stackFrame:
             states = deque(maxlen=4)
             for i in range(4):
-                states.append(state)
+                states.append(1)
 
         eps_reward = torch.tensor([0], dtype=torch.float)
 
@@ -189,6 +190,12 @@ class BBF:
                     action.item()
                 )
 
+            # print(
+            #     f"Step: {step}, Action: {action.item()}, Reward: {reward:.2f}",
+            #     end="\r",
+            #     flush=True,
+            # )
+
             state = self.model.preprocess(state).unsqueeze(0)
             if self.stackFrame:
                 states.append(state)
@@ -218,7 +225,7 @@ class BBF:
             if (
                 not self.real_env
                 and len_memory > self.batch_size
-                and len_memory > self.memory_size // 2
+                and (len_memory > self.memory_size // 2 or len_memory > 1000)
             ):
                 for i in range(self.replay_ratio):
                     self.optimize(grad_step, n)
@@ -226,16 +233,17 @@ class BBF:
                     grad_step += 1
 
             if self.real_env and done_flag:
+                time.sleep(1)  # Give some time for the environment to reset
+                keyboard.press_and_release("f10")
                 for _ in tqdm.tqdm(range(episode_steps)):
-                    if (
-                        len_memory > self.batch_size
-                        and len_memory > self.memory_size // 2
+                    if len_memory > self.batch_size and (
+                        len_memory > self.memory_size // 2 or len_memory > 1000
                     ):
                         for i in range(self.replay_ratio):
                             self.optimize(grad_step, n)
                             target_model_ema(self.model, self.model_target)
                             grad_step += 1
-                print(f"Episode finished after {episode_steps} steps")
+                keyboard.press_and_release("esc")
                 episode_steps = 0
 
             if save_freq != None and ((step + 1) % save_freq) == 0:
