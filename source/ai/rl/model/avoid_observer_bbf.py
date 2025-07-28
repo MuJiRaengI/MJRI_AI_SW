@@ -58,6 +58,9 @@ class BBF_Model(nn.Module):
         self.hiddens=hiddens
         self.scale_width=scale_width
         self.num_buckets = num_buckets
+        self.Vmin = Vmin
+        self.Vmax = Vmax
+        self.resize = resize
 
         self.act = nn.ReLU()
         self.transforms = transforms.Compose([transforms.Resize(resize)])
@@ -69,12 +72,23 @@ class BBF_Model(nn.Module):
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=True, max_pool=True, act=self.act, layers=3),
             DQN_Conv(32*scale_width, 32*scale_width, 3, 1, 1, norm=False, act=self.act, layers=2)
         )
+        
+        dummy = torch.zeros(1, 12, *resize)  # (batch, channel, H, W)
+        with torch.no_grad():
+            cnn_out = self.encoder_cnn(dummy)
+            cnn_flat = cnn_out.flatten(1)
+            cnn_feat_dim = cnn_flat.shape[1]  # flatten dimension
+
 
         self.direction_encoder = nn.Linear(4, 400)
     
-        # Single layer dense that maps the flattened encoded representation into hiddens.
-        self.projection = MLP(3200*scale_width+400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
-        self.trans_projection = MLP(3200*scale_width, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        # # Single layer dense that maps the flattened encoded representation into hiddens.
+        # self.projection = MLP(3200*scale_width+400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        # self.trans_projection = MLP(3200*scale_width, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        
+        self.projection = MLP(cnn_feat_dim + 400, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        self.trans_projection = MLP(cnn_feat_dim, med_hiddens=hiddens, out_hiddens=hiddens, layers=1)
+        
         self.prediction = MLP(hiddens, out_hiddens=hiddens, layers=1)
                                               
         self.transition = nn.Sequential(DQN_Conv(32*scale_width+n_actions, 32*scale_width, 3, 1, 1, norm=False, act=self.act),
@@ -103,9 +117,9 @@ class BBF_Model(nn.Module):
 
     def preprocess(self, state):
         image = torch.tensor(state["image"], dtype=torch.float).cuda() / 255
-        _, height, width = image.shape
-        start, end = width//2-height//2, width//2+height//2
-        image = image[:, :, start:end] # image crop
+        # _, height, width = image.shape
+        # start, end = width//2-height//2, width//2+height//2
+        # image = image[:, :, start:end] # image crop
 
         vector = torch.tensor(state["vector"], dtype=torch.float).cuda()
         vector = vector.view(-1, 1, 1).expand(-1, *image.shape[-2:]) # vector to image channel
@@ -116,6 +130,11 @@ class BBF_Model(nn.Module):
         # # image check
         # a = state[:3]
         # a = a.permute(1, 2, 0)
+
+        # s0 = state[0:3]
+        # s1 = state[3:6]
+        # s2 = state[6:9]
+        # s3 = state[9:12]
 
         return state
     
@@ -218,7 +237,15 @@ class BBF_Model(nn.Module):
 
     def hard_reset(self, random_model=None, alpha=0.5):
         if random_model == None:
-            random_model = BBF_Model(self.n_actions, self.hiddens, self.scale_width, self.num_buckets).cuda()
+            random_model = BBF_Model(
+            self.n_actions,
+            self.hiddens,
+            self.scale_width,
+            self.num_buckets,
+            self.Vmin,
+            self.Vmax,
+            self.resize
+        ).cuda()
 
         with torch.no_grad():
             

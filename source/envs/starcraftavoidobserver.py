@@ -33,7 +33,7 @@ class StarcraftAvoidObserver(Env):
         super().__init__()
         self.env_id = "StarcraftAvoidObserver-v0"
         self.agent = None
-        self.total_timesteps = 100000
+        self.total_timesteps = 200000
         self.save_freq = 3000
         self.logging_freq = 1000
         self.feature_dim = 256
@@ -207,10 +207,10 @@ class StarcraftAvoidObserver(Env):
         model = BBF_Model(
             n_actions,  # env action space size
             hiddens=2048,  # representation dim
-            scale_width=8,  # cnn channel scale
+            scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=100,  # max value in distributional RL
+            Vmax=10,  # max value in distributional RL
             resize=(80, 80),  # input resize
         ).cuda()
 
@@ -229,14 +229,15 @@ class StarcraftAvoidObserver(Env):
             reset_freq=40000,  # reset schedule in grad step
             replay_ratio=2,  # update number in one step
             weight_decay=0.1,  # weight decay in optimizer,
-            epsilon=0,
+            epsilon=0.05,
             gym_env=True,
             stackFrame=False,
             real_env=True,
         )
 
-        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup_default_direction7\bbf_avoid_observer_130000_steps.pth"
-        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Starcraft_avoid_observer\backup2\bbf_avoid_observer_51000_steps.pth"
+        # model_path = ""
+        # model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\AvoidStoppedObserver\bbf_backup\bbf_avoid_observer_160000_steps.pth"
+        model_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\Starcraft_avoid_observer\backup7\bbf_avoid_observer_87000_steps.pth"
         if os.path.exists(model_path):
             print(f"기존 모델을 불러옵니다: {model_path}")
             agent.load(model_path)
@@ -267,12 +268,12 @@ class StarcraftAvoidObserver(Env):
         model = BBF_Model(
             n_actions,  # env action space size
             hiddens=2048,  # representation dim
-            scale_width=8,  # cnn channel scale
+            scale_width=4,  # cnn channel scale
             num_buckets=51,  # buckets in distributional RL
             Vmin=-2,  # min value in distributional RL
-            Vmax=100,  # max value in distributional RL
+            Vmax=10,  # max value in distributional RL
             resize=(80, 80),  # input resize
-        ).cuda()  # input resize
+        ).cuda()
         state = model.preprocess(obs).unsqueeze(0)
 
         # 초기 렌더링을 위해 단일 환경에 접근
@@ -315,14 +316,6 @@ class StarcraftAvoidObserver(Env):
             # 모델이 제대로 로드되었을 때만 예측 수행
             if model is not None:
                 # 모델 예측
-                r_state1 = state[0, :3]
-                r_state2 = state[0, 3:6]
-                r_state3 = state[0, 6:9]
-                r_state4 = state[0, 9:12]
-                r_state5 = state[0, 12:15]
-
-                # if count > 30:
-                #     print("")
                 action = model.predict(state.unsqueeze(0))
                 obs, reward, done, info = env.step(action.cpu().item())
                 # print(f"Reward: {round(reward, 2)}", end="\r", flush=True)

@@ -17,6 +17,8 @@ from .utils import *
 
 import locale
 import keyboard
+import logging
+from datetime import datetime
 
 locale.getpreferredencoding = lambda: "UTF-8"
 
@@ -67,6 +69,15 @@ class BBF:
         self.stackFrame = stackFrame
         self.real_env = real_env
         self.running = True
+        self.start_time = datetime.now()
+        if self.real_env:
+            filename = f"results_{self.start_time.strftime('%Yy%mm%dd_%Hh%Mm%Ss')}.txt"
+            logging.basicConfig(
+                filename=filename,
+                level=logging.INFO,
+                format="%(asctime)s | %(levelname)s | %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
         keyboard.add_hotkey("ctrl+p", self.stop_running)
         keyboard.add_hotkey("f4", self.stop_running)
 
@@ -160,9 +171,13 @@ class BBF:
             else:
                 Q_action = self.model_target.env_step(state.unsqueeze(0))
 
-            action = epsilon_greedy(
-                Q_action, self.n_actions, len(self.memory), self.epsilon
-            ).cpu()
+            action, now_epsilon = epsilon_greedy(
+                Q_action,
+                self.n_actions,
+                len(self.memory),
+                self.epsilon,
+            )
+            action = action.cpu()
 
             if self.stackFrame:
                 self.memory.push(
@@ -234,17 +249,31 @@ class BBF:
 
             if self.real_env and done_flag:
                 time.sleep(1)  # Give some time for the environment to reset
-                keyboard.press_and_release("f10")
-                for _ in tqdm.tqdm(range(episode_steps)):
-                    if len_memory > self.batch_size and (
-                        len_memory > self.memory_size // 2 or len_memory > 1000
-                    ):
-                        for i in range(self.replay_ratio):
-                            self.optimize(grad_step, n)
-                            target_model_ema(self.model, self.model_target)
-                            grad_step += 1
+                if episode_steps > 150:
+                    keyboard.press_and_release("f10")
+                self.env.stop_focusing()
+                if episode_steps > 10:
+                    for _ in tqdm.tqdm(range(episode_steps)):
+                        if len_memory > self.batch_size and (
+                            len_memory > self.memory_size // 2 or len_memory > 1000
+                        ):
+                            for i in range(self.replay_ratio):
+                                self.optimize(grad_step, n)
+                                target_model_ema(self.model, self.model_target)
+                                grad_step += 1
                 keyboard.press_and_release("esc")
                 episode_steps = 0
+                logging.info(
+                    f"[REAL_ENV] Ep#{step} done | Steps: {episode_steps}, grad_step: {grad_step}, "
+                    f"len_memory: {len_memory}, eps_reward: {round(eps_reward.item(), 5)}, "
+                    f"n: {n}, replay_ratio: {self.replay_ratio}, "
+                    f"last_action: {action.item()}, last_reward: {reward[-1]}, "
+                    f"now_epsilon: {round(now_epsilon, 5)}"
+                )
+                if random.random() < 0.2:
+                    time.sleep(30)
+
+                self.env.start_focusing()
 
             if save_freq != None and ((step + 1) % save_freq) == 0:
                 save_checkpoint_path = f"{save_path}/{name_prefix}_{step+1}_steps.tmp"

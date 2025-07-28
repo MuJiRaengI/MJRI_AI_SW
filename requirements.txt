@@ -30,4 +30,4 @@ sentence-transformers
 faiss-cpu
 langchain-community
 hf_xet
-
+pytesseract

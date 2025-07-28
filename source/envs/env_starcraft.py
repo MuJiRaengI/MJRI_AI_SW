@@ -13,11 +13,14 @@ import os
 import time
 import threading
 from datetime import datetime
+import pytesseract
 
 from source.utils.mjri_screen import MJRIScreen
 from source.utils.mjri_keyboard import MJRIKeyboard
 from source.utils.mjri_mouse import MJRIMouse
 from source.ai.rl.model.find_avoid_observer_model import DoubleResnet18, UNet
+
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
 class EnvStarcraft(gym.Env):
@@ -207,6 +210,15 @@ class EnvStarcraft(gym.Env):
 
     def _get_image_obs(self):
         state = self.get_stacked_state()
+        frames = F.interpolate(
+            state,
+            scale_factor=(self.scale_factor, self.scale_factor),
+            mode="nearest",
+        )
+        # shape B, C, H, W -> BC, H, W
+        frames = frames.view(-1, frames.shape[2], frames.shape[3])
+
+        return frames
 
         with torch.no_grad():
             detect_scene = self.transform_detection(state)
@@ -324,8 +336,8 @@ class EnvStarcraft(gym.Env):
         if unit_die or unit_reset:
             time.sleep(2)
             # check goal
-            if self.check_goal(game_scene):
-                now_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if self.check_goal(unit_info):
+                now_time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
                 os.mkdir(f"goal_{now_time}")
                 return 1.0, True
 
@@ -385,23 +397,32 @@ class EnvStarcraft(gym.Env):
         pass
 
     def check_goal(self, frame):
-        crop_frame = frame[
-            self.y_crop : self.y_crop + self.h_crop,
-            self.x_crop : self.x_crop + self.w_crop,
-        ]
+        def using_ocr():
+            self.mouse.drag(
+                self.x + 30,
+                self.y + 30,
+                self.x + 1100,
+                self.y + 600,
+            )
+            unit_info = self.screen.screenshot_buffer[-1][750:, 280:810]
+            gray = cv2.cvtColor(unit_info, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
+            text = pytesseract.image_to_string(thresh, lang="eng")
 
-        scout_template_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\source\envs\starcraft\template\scout"
-        templates = os.listdir(scout_template_path)
-
-        for template in templates:
-            template_path = os.path.join(scout_template_path, template)
-            template_img = cv2.imread(template_path)
-            res = cv2.matchTemplate(crop_frame, template_img, cv2.TM_CCOEFF_NORMED)
-            threshold = 0.8
-            loc = np.where(res >= threshold)
-
-            if len(loc[0]) > 0:
+            if "Artanis" in text or "Lv.2" in text:
                 return True
+            return False
+
+        # ocr
+        check_goal = using_ocr()
+        if check_goal:
+            while using_ocr():
+                print("Goal achieved! Waiting for confirmation...")
+                self.keyboard.set_numbering(self.focus_num)
+                self.keyboard.focus_numbering(str(self.focus_num))
+                self.unit_move_with_angle(0, 300)
+                time.sleep(0.5)
+            return check_goal
 
         return False
 

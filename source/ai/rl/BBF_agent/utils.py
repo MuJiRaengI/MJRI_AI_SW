@@ -3,6 +3,7 @@ import copy
 import random
 import numpy as np
 
+# fmt: off
 def save_checkpoint(net, model_target, path):
     torch.save({
         'model_state_dict': net.state_dict(),
@@ -29,13 +30,13 @@ def linearly_decaying_epsilon(decay_period, step, warmup_steps, epsilon):
     return epsilon + bonus
 
 def epsilon_greedy(Q_action, n_actions, step, final_eps=0, num_envs=1):
-    epsilon = linearly_decaying_epsilon(2001, step, 2000, final_eps)
+    epsilon = linearly_decaying_epsilon(6001, step, 2000, final_eps)
     
     if random.random() < epsilon:
         action = torch.randint(0, n_actions, (num_envs,), dtype=torch.int64, device='cuda').squeeze(0)
     else:
         action = Q_action.view(num_envs).squeeze(0).to(torch.int64)
-    return action
+    return action, epsilon
 
 # https://github.com/google/dopamine/blob/master/dopamine/jax/agents/rainbow/rainbow_agent.py
 def project_distribution(supports, weights, target_support):
