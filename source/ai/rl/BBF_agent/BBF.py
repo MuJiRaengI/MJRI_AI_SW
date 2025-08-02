@@ -270,8 +270,6 @@ class BBF:
                     f"last_action: {action.item()}, last_reward: {reward[-1]}, "
                     f"now_epsilon: {round(now_epsilon, 5)}"
                 )
-                if random.random() < 0.2:
-                    time.sleep(30)
 
                 self.env.start_focusing()
 
