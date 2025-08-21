@@ -130,14 +130,32 @@ class SaveOnStepCallback(BaseCallback):
         # step마다 reward 누적
         rewards = self.locals["rewards"]
         dones = self.locals["dones"]
-        for reward, done in zip(rewards, dones):
+        infos = self.locals.get("infos", [])
+
+        for i, (reward, done) in enumerate(zip(rewards, dones)):
             self._current_ep_reward += float(reward)
             self._current_ep_length += 1
             if done:
+                # done이 True일 때 해당 환경의 board 최대값 가져오기
+                obs = self.locals["obs_tensor"][i].detach().cpu().numpy()
+                board = 2 ** obs.argmax(0)
+                max_tile = board.max()
+
                 self.episode_rewards.append(self._current_ep_reward)
                 self.episode_rewards = self.episode_rewards[-self.max_log_length :]
                 self.episode_lengths.append(self._current_ep_length)
                 self.episode_lengths = self.episode_lengths[-self.max_log_length :]
+
+                # done일 때 최대 타일 정보 출력
+                if max_tile is not None:
+                    if max_tile > 1024:
+                        print(
+                            f"[EPISODE_END] Env {i}: Reward={self._current_ep_reward:.1f}, Max_tile={max_tile}, obs=\n{board}"
+                        )
+                    else:
+                        print(
+                            f"[EPISODE_END] Env {i}: Reward={self._current_ep_reward:.1f}, Max_tile={max_tile}"
+                        )
                 self._current_ep_reward = 0
                 self._current_ep_length = 0
 
