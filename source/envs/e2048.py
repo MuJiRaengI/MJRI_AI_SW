@@ -14,7 +14,7 @@ import ale_py
 import pygame
 
 gym.register_envs(ale_py)
-from stable_baselines3 import PPO
+# from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from source.envs.env import Env
 
@@ -25,8 +25,6 @@ from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from stable_baselines3.common.env_util import make_vec_env
 from source.ai.rl.BBF_agent.BBF import BBF
-from source.ai.rl.model.vit import ViT, ViTConfig
-from source.ai.rl.model.cnn_2048 import CNN2048Extractor
 from source.ai.rl.model.resnet_2048 import ResNet2048Extractor
 
 
@@ -141,75 +139,54 @@ class E2048(Env):
         env.close()
 
     def _train(self, *args, **kwargs):
-        def _make_env_fn(size, max_exp):
-            def _thunk():
-                env = Env2048PG(
-                    size=size,
-                    max_exp=self.max_exp,
-                    reward_mode="custom",
-                    invalid_move_penalty=-1,
-                )
-                env = BoardToImageWrapper(env, max_exp)  # ★ wrapper 적용
-                return env
-
-            return _thunk
-
         log_dir = os.path.join(self.save_dir, self.log_dir)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
 
-        env = make_vec_env(
-            _make_env_fn(self.size, self.max_exp),
-            n_envs=1,
-            vec_env_cls=SubprocVecEnv,  # 프로세스 병렬화
+        env = Env2048PG(
+            size=self.size,
+            max_exp=self.max_exp,
+            reward_mode="custom",
+            invalid_move_penalty=-1,
         )
 
         # 진행상황 전달
         if self.training_queue is not None:
             self.training_queue.put(("total_steps", self.total_timesteps))
 
-        callback = SaveOnStepCallback(
-            save_freq=self.save_freq,
-            logging_freq=self.logging_freq,
-            save_dir=self.save_dir,
-            name_prefix="ppo_e2048",
-            log_dir=log_dir,
-            progress_queue=self.training_queue,
-            verbose=1,
-        )
+        model = ResNet2048Extractor(
+            features_dim=256, size=self.size, max_exp=self.max_exp
+        ).cuda()
 
-        # policy_kwargs = dict(
-        #     features_extractor_class=CNN2048Extractor,
-        #     features_extractor_kwargs=dict(features_dim=256, size=self.size),
-        #     net_arch=dict(pi=[128], vf=[128]),  # policy/value head 크기(선택)
-        # )
-        policy_kwargs = dict(
-            features_extractor_class=ResNet2048Extractor,
-            features_extractor_kwargs=dict(
-                features_dim=256, size=self.size, max_exp=self.max_exp
-            ),
-            net_arch=dict(pi=[128], vf=[128]),  # policy/value head 크기(선택)
-        )
-
-        model = PPO(
-            "CnnPolicy",
+        agent = BBF(
+            model,
             env,
-            policy_kwargs=policy_kwargs,
-            device="cuda:0",
-            verbose=1,
-            n_steps=1024,
-            batch_size=256,
-            learning_rate=3e-4,
-            gamma=0.99,
+            learning_rate=1e-4,
+            batch_size=32,
+            ema_decay=0.995,  # target model ema decay
+            initial_gamma=0.97,  # starting gamma
+            final_gamma=0.997,  # final gamma
+            initial_n=10,  # starting n-step
+            final_n=3,  # final n-step
+            num_buckets=51,  # buckets in distributional RL
+            reset_freq=40000,  # reset schedule in grad step
+            replay_ratio=2,  # update number in one step
+            weight_decay=0.1,  # weight decay in optimizer
         )
-        model.learn(total_timesteps=self.total_timesteps, callback=callback)
+
+        agent.learn(
+            total_timesteps=self.total_timesteps,
+            save_freq=self.save_freq,
+            save_path=self.save_dir,
+            name_prefix="bbf_2048",
+        )
 
         # 학습 완료 신호
         if self.training_queue is not None:
             self.training_queue.put(("done", None))
 
         # 모델 저장
-        save_path = os.path.join(self.save_dir, "ppo_e2048.zip")
+        save_path = os.path.join(self.save_dir, "bbf_e2048.zip")
         tmp_path = save_path.replace("zip", "tmp")
         model.save(tmp_path)
         os.replace(tmp_path, save_path)

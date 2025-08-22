@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 
 class ResNetBlock(nn.Module):
@@ -20,23 +19,16 @@ class ResNetBlock(nn.Module):
         return F.relu(out)
 
 
-class ResNet2048Extractor(BaseFeaturesExtractor):
-    """
-    2048용 ResNet 스타일 Feature Extractor (4x4 입력에 최적화)
-    입력: (batch, 1, 4, 4) 또는 (batch, 4, 4)
-    출력: (batch, features_dim)
-    """
-
+class ResNet2048Extractor(nn.Module):
     def __init__(
         self,
-        observation_space,
         size,
         max_exp,
         features_dim=128,
         n_blocks=3,
         channels=64,
     ):
-        super().__init__(observation_space, features_dim)
+        super().__init__()
         self.channels = channels
         self.size = size
         self.max_exp = max_exp
