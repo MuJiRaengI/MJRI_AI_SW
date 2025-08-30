@@ -13,6 +13,7 @@ import torch.optim as optim
 import numpy as np
 import gymnasium as gym
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
+from stable_baselines3.common.atari_wrappers import NoopResetEnv, FireResetEnv
 
 from .agent import Agent
 
@@ -39,15 +40,21 @@ class CustomTrainState:
 class PQN(Agent):
     def __init__(
         self,
+        model: nn.Module,
         save_dir: str,
         logging_freq=100,
         detailed_logging_freq=500,
     ):
         super().__init__(save_dir, logging_freq, detailed_logging_freq)
+        self.model = model
+
+        # architecture_info = model.body.get_architecture_info()
+        # self.logger.info(f" QNetwork-body 모델 구조: {architecture_info}")
 
     def make_env(
         self,
         env_id: str,
+        render_mode: str = None,
         frame_stack: int = 4,
         frame_skip: int = 1,
         noop_max: int = 30,
@@ -58,7 +65,7 @@ class PQN(Agent):
         seed: int = None,
     ):
         def _init():
-            env = gym.make(env_id, frameskip=1)
+            env = gym.make(env_id, frameskip=1, render_mode=render_mode)
             env = gym.wrappers.AtariPreprocessing(
                 env,
                 noop_max=noop_max,
@@ -68,6 +75,8 @@ class PQN(Agent):
                 grayscale_obs=grayscale_obs,
                 scale_obs=scale_obs,
             )
+            if "FIRE" in env.unwrapped.get_action_meanings():
+                env = FireResetEnv(env)
             env = gym.wrappers.FrameStackObservation(env, frame_stack)
 
             # Set seeds if provided
@@ -192,6 +201,7 @@ class PQN(Agent):
         optimizer: optim.Optimizer,
         num_epochs: int,
         num_minibatches: int,
+        frame_stack: int,
         train_state: CustomTrainState,
         current_obs: ObsType,
         total_envs: int,
@@ -396,7 +406,7 @@ class PQN(Agent):
         metrics = {
             "env_step": train_state.timesteps,
             "update_steps": train_state.n_updates,
-            "env_frame": train_state.timesteps * 4,  # 4 stacked frames
+            "env_frame": train_state.timesteps * frame_stack,
             "grad_steps": train_state.grad_steps,
             "td_loss": total_loss / (num_epochs * num_minibatches),
             "qvals": total_qvals / (num_epochs * num_minibatches),
@@ -421,6 +431,7 @@ class PQN(Agent):
         num_updates: int,
         num_epochs: int,
         num_minibatches: int,
+        frame_stack: int,
         total_envs: int,
         num_envs: int,
         num_test_envs: int,
@@ -472,6 +483,7 @@ class PQN(Agent):
                 optimizer=optimizer,
                 num_epochs=num_epochs,
                 num_minibatches=num_minibatches,
+                frame_stack=frame_stack,
                 train_state=train_state,
                 current_obs=current_obs,
                 total_envs=total_envs,
@@ -613,7 +625,7 @@ class PQN(Agent):
             "metrics": all_metrics,
         }
 
-    def learn(self, model: nn.Module, config: dict):
+    def learn(self, config: dict):
         self.device = config["device"]
         env_name = config["env_name"]
 
@@ -684,10 +696,11 @@ class PQN(Agent):
 
         outs = self._train(
             env=env,
-            model=model,
+            model=self.model,
             num_updates=num_updates,
             num_epochs=num_epochs,
             num_minibatches=num_minibatches,
+            frame_stack=frame_stack,
             total_envs=total_envs,
             num_envs=num_envs,
             num_test_envs=num_test_envs,
@@ -754,4 +767,100 @@ class PQN(Agent):
             )
 
         # Agent 클래스의 최종 모델 저장 기능 사용
-        self.save_final_model(model, step=self.total_steps)
+        self.save_final_model(self.model, step=self.total_steps)
+
+        self.model.cpu()
+
+    def predict(self, obs, deterministic: bool = False):
+        """
+        학습된 모델을 사용해서 행동 예측
+
+        Args:
+            obs: 관측값 (numpy array or torch tensor)
+            deterministic: True면 greedy 행동, False면 epsilon-greedy 행동
+
+        Returns:
+            action: 예측된 행동 (int or numpy array)
+            q_values: Q-값들 (optional, numpy array)
+        """
+        self.model.eval()
+
+        with torch.no_grad():
+            # 입력 전처리
+            if isinstance(obs, np.ndarray):
+                obs_tensor = torch.from_numpy(obs).float()
+            else:
+                obs_tensor = obs.float()
+
+            # 배치 차원 추가 (필요한 경우)
+            if len(obs_tensor.shape) == 3:  # (C, H, W) -> (1, C, H, W)
+                obs_tensor = obs_tensor.unsqueeze(0)
+            elif len(obs_tensor.shape) == 2:  # (H, W) -> (1, 1, H, W)
+                obs_tensor = obs_tensor.unsqueeze(0).unsqueeze(0)
+
+            # 디바이스로 이동
+            obs_tensor = obs_tensor.to(self.device)
+
+            # Q-값 계산
+            q_values = self.model(obs_tensor)
+
+            if deterministic:
+                # Greedy 행동 선택 (최고 Q-값)
+                actions = torch.argmax(q_values, dim=-1)
+            else:
+                # Epsilon-greedy 행동 선택 (기본 epsilon=0.01)
+                eps = 0.01
+                actions = self.eps_greedy_exploration(q_values, eps)
+
+            # CPU로 이동 및 numpy 변환
+            actions_np = actions.cpu().numpy()
+            q_values_np = q_values.cpu().numpy()
+
+            # 단일 관측값인 경우 스칼라 반환
+            if obs_tensor.shape[0] == 1:
+                return actions_np[0], q_values_np[0]
+            else:
+                return actions_np, q_values_np
+
+    def predict_batch(self, obs_batch, deterministic: bool = False):
+        """
+        배치 관측값에 대해 행동 예측 (predict의 배치 버전)
+
+        Args:
+            obs_batch: 배치 관측값 (numpy array or torch tensor)
+            deterministic: True면 greedy 행동, False면 epsilon-greedy 행동
+
+        Returns:
+            actions: 예측된 행동들 (numpy array)
+            q_values: Q-값들 (numpy array)
+        """
+        return self.predict(obs_batch, deterministic=deterministic)
+
+    def get_q_values(self, obs):
+        """
+        관측값에 대한 Q-값들만 반환
+
+        Args:
+            obs: 관측값 (numpy array or torch tensor)
+
+        Returns:
+            q_values: Q-값들 (numpy array)
+        """
+        _, q_values = self.predict(obs, deterministic=True)
+        return q_values
+
+    def load_model(self, model_path: str):
+        """
+        저장된 모델 가중치 로드
+
+        Args:
+            model_path: 모델 파일 경로 (.pth 파일)
+        """
+        try:
+            state_dict = torch.load(model_path, map_location=self.device)
+            self.model.load_state_dict(state_dict)
+            self.model.to(self.device)
+            self.logger.info(f"모델 로드 완료: {model_path}")
+        except Exception as e:
+            self.logger.error(f"모델 로드 실패: {e}")
+            raise e

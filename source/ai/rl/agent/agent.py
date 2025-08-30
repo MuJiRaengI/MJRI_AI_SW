@@ -23,6 +23,7 @@ class Agent(abc.ABC):
         self.logger = self._setup_logger(save_dir, "log.txt")
 
         # 모델 저장 관련 속성
+        self.model = None
         self.save_dir = save_dir
         self.model_name = "model"
         self.max_best_models = 5
@@ -67,6 +68,25 @@ class Agent(abc.ABC):
         logger.info(f"로거 초기화 완료 - 로그 파일: {log_file_path}")
         return logger
 
+    def _format_time(self, total_seconds: float) -> str:
+        """초를 일/시/분/초 형태로 변환"""
+        days = int(total_seconds // 86400)
+        hours = int((total_seconds % 86400) // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+        seconds = int(total_seconds % 60)
+
+        time_str = []
+        if days > 0:
+            time_str.append(f"{days}일")
+        if hours > 0:
+            time_str.append(f"{hours}시간")
+        if minutes > 0:
+            time_str.append(f"{minutes}분")
+        if seconds > 0 or not time_str:  # 최소한 초는 표시
+            time_str.append(f"{seconds}초")
+
+        return " ".join(time_str)
+
     def setup_model_saving(
         self,
         save_dir: str,
@@ -87,6 +107,7 @@ class Agent(abc.ABC):
             return
 
         if mean_reward > self.best_mean_reward:
+            before_reward = self.best_mean_reward
             self.best_mean_reward = mean_reward
             step = step or self.total_steps
             # 소수점을 언더바로 변경하여 확장자와 구분
@@ -101,7 +122,7 @@ class Agent(abc.ABC):
                 torch.save(model.state_dict(), best_path)
                 self.logger.info(f"[BEST 모델] 새로운 최고 성능! 저장: {best_path}")
                 self.logger.info(
-                    f"평균 보상: {mean_reward:.3f} (이전: {self.best_mean_reward:.3f})"
+                    f"평균 보상: {mean_reward:.3f} (이전: {before_reward:.3f})"
                 )
                 self.logger.info(f"스텝: {step}")
                 self._cleanup_best_models()
@@ -124,7 +145,7 @@ class Agent(abc.ABC):
             self.logger.info(f"[최종 모델] 저장: {final_path}")
             if self.start_time:
                 total_time = time.time() - self.start_time
-                self.logger.info(f"총 훈련 시간: {total_time:.0f}초")
+                self.logger.info(f"총 훈련 시간: {self._format_time(total_time)}")
             if self.episode_rewards:
                 self.logger.info(
                     f"최종 평균 보상: {np.mean(self.episode_rewards[-100:]):.3f}"
@@ -182,4 +203,8 @@ class Agent(abc.ABC):
 
     @abc.abstractmethod
     def learn(self):
+        pass
+
+    @abc.abstractmethod
+    def predict(self):
         pass
