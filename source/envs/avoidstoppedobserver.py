@@ -16,7 +16,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from source.envs.env import Env
 from source.env_callback.save_on_step_callback import SaveOnStepCallback
 from source.ai.rl.model.find_avoid_observer_model import AvoidObserverExtractor
-from .env_avoid_observber import EnvAvoidObserver
+from ..envs.env_avoid_observber import EnvAvoidObserver
 from source.ai.rl.BBF_agent.BBF import BBF
 from source.ai.rl.model.avoid_observer_bbf import BBF_Model
 
