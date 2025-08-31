@@ -18,7 +18,7 @@ test.py
 *.pth
 *.txt
 vectordb/
-
+results/
 
 !map_direct.png
 !map.png
