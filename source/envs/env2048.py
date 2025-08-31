@@ -462,6 +462,34 @@ class Env2048PG(gym.Env):
         except Exception:
             pass
 
+    def simulate(self, action: int):
+        """
+        주어진 액션에 대해 시뮬레이션된 다음 상태를 반환합니다.
+        현재 상태는 변경되지 않습니다.
+
+        Args:
+            action (int): 수행할 액션 (0: ↑, 1: →, 2: ↓, 3: ←)
+
+        Returns:
+            dict: 시뮬레이션된 관측값 (obs)
+        """
+        assert self.action_space.contains(action), "Invalid action"
+
+        # 현재 상태 백업
+        board_bk = self.board.copy()
+        score_bk = self.score
+
+        # 액션 시뮬레이션
+        self._move(action)
+        self._spawn_random_tile()
+        simulated_obs = self._get_obs()
+
+        # 상태 복구
+        self.board = board_bk
+        self.score = score_bk
+
+        return simulated_obs
+
 
 # --------------------- 간단 실행기 ---------------------
 def _autoplay_step(env: Env2048PG):
@@ -531,7 +559,7 @@ if __name__ == "__main__":
 
         # 스텝
         if action is not None and not done:
-            obs, reward, done, info = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
             action = None
 
         env.render()
