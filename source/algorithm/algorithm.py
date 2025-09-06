@@ -5,6 +5,7 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
+from datetime import datetime
 
 
 class Algorithm(abc.ABC):
@@ -14,6 +15,8 @@ class Algorithm(abc.ABC):
         logging_freq: int,
         detailed_logging_freq: int,
     ):
+        now = datetime.now().strftime("%Yy%mm%dd_%Hh%Mm%Ss")
+        save_dir = os.path.join(save_dir, now)
         self.logging_freq = logging_freq
         self.detailed_logging_freq = detailed_logging_freq
 
