@@ -11,6 +11,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 import ale_py
+import time
 import pygame
 
 gym.register_envs(ale_py)
@@ -313,5 +314,17 @@ def test():
     )
 
 
+def time_check():
+    env = Env2048PG(size=4)
+    _ = env.reset()
+    tmr = time.time()
+    count = 0
+    while (time.time() - tmr) < 1:
+        _, _, done, _, _ = env.step(0)
+        count += 1
+
+    print(f"1초 동안 {count} 에피소드 진행")  # 1361
+
+
 if __name__ == "__main__":
-    test()
+    time_check()
