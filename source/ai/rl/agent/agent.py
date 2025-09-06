@@ -2,10 +2,11 @@ import abc
 import logging
 import os
 import time
-import numpy as np
+from datetime import datetime
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class Agent(abc.ABC):
@@ -15,6 +16,8 @@ class Agent(abc.ABC):
         logging_freq: int,
         detailed_logging_freq: int,
     ):
+        now = datetime.now().strftime("%Yy%mm%dd_%Hh%Mm%Ss")
+        save_dir = os.path.join(save_dir, now)
         self.logging_freq = logging_freq
         self.detailed_logging_freq = detailed_logging_freq
         self.device = "cpu"
