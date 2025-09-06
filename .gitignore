@@ -17,6 +17,7 @@ test.py
 *.json
 *.pth
 *.txt
+*.pkl
 vectordb/
 results/
 
