@@ -31,3 +31,5 @@ faiss-cpu
 langchain-community
 hf_xet
 pytesseract
+swig
+gymnasium[box2d]
