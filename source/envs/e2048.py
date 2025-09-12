@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath("."))
 
 import re
 import time
+import json
 
 import torch
 import numpy as np
@@ -140,58 +141,13 @@ class E2048(Env):
         env.close()
 
     def _train(self, *args, **kwargs):
-        log_dir = os.path.join(self.save_dir, self.log_dir)
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
+        config_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\configs\algorithm\GA\2048\config.json"
 
-        env = Env2048PG(
-            size=self.size,
-            max_exp=self.max_exp,
-            reward_mode="custom",
-            invalid_move_penalty=-1,
-        )
+        with open(config_path, "r") as f:
+            config = json.load(f)
 
-        # 진행상황 전달
-        if self.training_queue is not None:
-            self.training_queue.put(("total_steps", self.total_timesteps))
-
-        model = ResNet2048Extractor(
-            features_dim=256, size=self.size, max_exp=self.max_exp
-        ).cuda()
-
-        agent = BBF(
-            model,
-            env,
-            learning_rate=1e-4,
-            batch_size=32,
-            ema_decay=0.995,  # target model ema decay
-            initial_gamma=0.97,  # starting gamma
-            final_gamma=0.997,  # final gamma
-            initial_n=10,  # starting n-step
-            final_n=3,  # final n-step
-            num_buckets=51,  # buckets in distributional RL
-            reset_freq=40000,  # reset schedule in grad step
-            replay_ratio=2,  # update number in one step
-            weight_decay=0.1,  # weight decay in optimizer
-        )
-
-        agent.learn(
-            total_timesteps=self.total_timesteps,
-            save_freq=self.save_freq,
-            save_path=self.save_dir,
-            name_prefix="bbf_2048",
-        )
-
-        # 학습 완료 신호
-        if self.training_queue is not None:
-            self.training_queue.put(("done", None))
-
-        # 모델 저장
-        save_path = os.path.join(self.save_dir, "bbf_e2048.zip")
-        tmp_path = save_path.replace("zip", "tmp")
-        model.save(tmp_path)
-        os.replace(tmp_path, save_path)
-        print(f"모델 저장 완료: {save_path}")
+        ga = GALunarLander(save_dir=os.path.join(self.save_dir, "train"))
+        ga.learn(config)
 
     def _test(self, *args, **kwargs):
         last_model_path = None

@@ -98,34 +98,34 @@ if __name__ == "__main__":
 
     ga = GALunarLander(save_dir=config["save_dir"])
 
-    # ga.learn(config)
+    ga.learn(config)
 
-    winner_path = os.path.join(
-        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results\GA\lunarlander\2025y09m06d_16h31m07s\best_genomes",
-        "rank_01_fitness_-35.28_gen_4_id_611.pkl",
-    )
-    neat_config_path = config["neat_config_path"]
-    neat_config = neat.Config(
-        neat.DefaultGenome,
-        neat.DefaultReproduction,
-        neat.DefaultSpeciesSet,
-        neat.DefaultStagnation,
-        neat_config_path,
-    )
+    # winner_path = os.path.join(
+    #     r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\results\GA\lunarlander\2025y09m06d_16h31m07s\best_genomes",
+    #     "rank_01_fitness_-35.28_gen_4_id_611.pkl",
+    # )
+    # neat_config_path = config["neat_config_path"]
+    # neat_config = neat.Config(
+    #     neat.DefaultGenome,
+    #     neat.DefaultReproduction,
+    #     neat.DefaultSpeciesSet,
+    #     neat.DefaultStagnation,
+    #     neat_config_path,
+    # )
 
-    ga.load_winner_net(winner_path, neat_config)
+    # ga.load_winner_net(winner_path, neat_config)
 
-    test_episodes = config["test_episodes"]
-    test_steps = config["test_steps"]
+    # test_episodes = config["test_episodes"]
+    # test_steps = config["test_steps"]
 
-    env = ga.make_env(render_mode="human")
-    for _ in range(test_episodes):
-        obs, _ = env.reset()
-        for _ in range(test_steps):
-            action = ga.predict(obs)
-            obs, reward, terminated, truncated, info = env.step(action)
-            if terminated or truncated:
-                break
-    env.close()
+    # env = ga.make_env(render_mode="human")
+    # for _ in range(test_episodes):
+    #     obs, _ = env.reset()
+    #     for _ in range(test_steps):
+    #         action = ga.predict(obs)
+    #         obs, reward, terminated, truncated, info = env.step(action)
+    #         if terminated or truncated:
+    #             break
+    # env.close()
 
-    print()
+    # print()
