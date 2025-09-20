@@ -19,7 +19,6 @@ import pygame
 from source.env_runner import EnvRunner
 
 from source.ai.rl.agent.pqn import PQN
-
 from source.ai.rl.model.pqn_enhance import QNetwork
 
 
@@ -33,7 +32,6 @@ class BreakoutRunner(EnvRunner):
 
     def _self_play(self, *args, **kwargs):
         env = gym.make(self.env_id, render_mode="rgb_array")
-        env.metadata["render_fps"] = self.fps
         obs, info = env.reset()
 
         pygame.init()

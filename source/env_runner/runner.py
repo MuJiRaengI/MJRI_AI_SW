@@ -1,4 +1,5 @@
 import abc
+import json
 
 
 class EnvRunner(abc.ABC):
@@ -7,6 +8,7 @@ class EnvRunner(abc.ABC):
         self.training_queue = None
         self.render_queue = None
         self.config_path = None
+        self.running = False
 
     @abc.abstractmethod
     def _self_play(self, *args, **kwargs):
@@ -29,7 +31,7 @@ class EnvRunner(abc.ABC):
         """Return key information for manual control."""
         return "No key information provided."
 
-    def play(self, config_path, mode="random", queue=None, *args, **kwargs):
+    def play(self, config_path: str, mode: str = "random", queue=None, *args, **kwargs):
         self.config_path = config_path
         self.mode = mode
         if mode == "self_play":
@@ -46,3 +48,12 @@ class EnvRunner(abc.ABC):
             return self._test(*args, **kwargs)
         else:
             raise ValueError(f"Unknown mode: {mode}")
+
+    def load_json(self, path: str) -> dict:
+        with open(path, "r") as f:
+            data = json.load(f)
+        return data
+
+    def save_json(self, path: str, data: dict):
+        with open(path, "w") as f:
+            json.dump(data, f, indent=4)

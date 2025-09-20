@@ -1,5 +1,8 @@
 import os
 import neat
+import matplotlib
+
+matplotlib.use("Agg")  # GUI 없는 백엔드 사용 - 화면 표시 방지
 import matplotlib.pyplot as plt
 import matplotlib.patheffects
 import numpy as np

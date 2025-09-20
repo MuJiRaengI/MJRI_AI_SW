@@ -4,22 +4,25 @@ import shutil
 import pickle
 import neat
 
-from source.algorithm.algorithm import Algorithm
+from source.core import Agent
 
 
-class GeneticAlgorithm(Algorithm):
-    def __init__(
-        self,
-        save_dir: str,
-        logging_freq=100,
-        detailed_logging_freq=500,
-    ):
-        super().__init__(save_dir, logging_freq, detailed_logging_freq)
-        self.env_id = None
-        self.env_num = None
-        self.num_episodes = None
-        self.max_step = None
-        self.winner_net = None
+class GeneticAlgorithm(Agent):
+    def __init__(self, config: dict):
+        super().__init__(config)
+
+    def create_dir(self):
+        super().create_dir()
+        ga_config_path = self.config["ga_config_path"]
+        if not os.path.isfile(ga_config_path):
+            raise FileNotFoundError(f"NEAT config file not found: {ga_config_path}")
+
+        # copy neat_config using shutil
+        shutil.copy(
+            ga_config_path,
+            os.path.join(self.save_dir, os.path.basename(ga_config_path)),
+        )
+        return
 
     def make_env(self):
         raise NotImplementedError("make_env method must be implemented in subclass")
@@ -40,31 +43,24 @@ class GeneticAlgorithm(Algorithm):
             "state_visualize method must be implemented in subclass"
         )
 
-    def learn(self, config: dict):
-        save_config_path = os.path.join(self.save_dir, "config.json")
-        with open(save_config_path, "w") as f:
-            json.dump(config, f, indent=4)
+    def learn(self):
+        self.create_dir()
 
-        self.env_id = config["env_name"]
-        self.env_num = config["env_num"]
-        self.num_episodes = config["num_episodes"]
-        self.max_step = config["max_step"]
+        ga_config_path = self.config["ga_config_path"]
 
-        neat_config_path = config["neat_config_path"]
-        num_generations = config["num_generations"]
+        self.env_id = self.config["env_id"]
+        self.env_num = self.config["env_num"]
+        self.num_episodes = self.config["num_episodes"]
+        self.max_step = self.config["max_step"]
 
-        # copy neat_config using shutil
-        shutil.copy(
-            neat_config_path,
-            os.path.join(self.save_dir, os.path.basename(neat_config_path)),
-        )
+        num_generations = self.config["num_generations"]
 
         neat_config = neat.Config(
             neat.DefaultGenome,
             neat.DefaultReproduction,
             neat.DefaultSpeciesSet,
             neat.DefaultStagnation,
-            neat_config_path,
+            ga_config_path,
         )
 
         p = neat.Population(neat_config)
@@ -103,7 +99,8 @@ class GeneticAlgorithm(Algorithm):
         config = data["config"]
 
         self.winner_net = neat.nn.FeedForwardNetwork.create(genome, config)
-        self.logger.info(f"Loaded winner genome from {path}")
+        # self.logger.info(f"Loaded winner genome from {path}")
+        print(f"✅ Loaded winner genome from {path}")
 
     def predict(self, obs):
         if self.winner_net is None:

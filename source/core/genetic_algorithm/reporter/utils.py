@@ -1,5 +1,8 @@
 import os
 import neat
+import matplotlib
+
+matplotlib.use("Agg")  # GUI 없는 백엔드 사용
 import matplotlib.pyplot as plt
 import matplotlib.patheffects
 import numpy as np
@@ -219,9 +222,9 @@ def save_network_plot(fig, filename="network_structure.png"):
         fig: matplotlib figure 객체
         filename: 저장할 파일명
     """
-    plt.figure(fig.number)  # figure를 활성화
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    # 화면에 표시하지 않고 직접 저장
+    fig.tight_layout()
+    fig.savefig(filename, dpi=300, bbox_inches="tight")
     print(f"Network structure saved to {filename}")
     plt.close(fig)
 

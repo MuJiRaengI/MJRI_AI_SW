@@ -1,37 +1,25 @@
 import abc
 import logging
 import os
-import time
-import numpy as np
-import torch
-import torch.nn as nn
+import json
 from datetime import datetime
 
 
-class Algorithm(abc.ABC):
-    def __init__(
-        self,
-        save_dir: str,
-        logging_freq: int,
-        detailed_logging_freq: int,
-    ):
-        now = datetime.now().strftime("%Yy%mm%dd_%Hh%Mm%Ss")
-        save_dir = os.path.join(save_dir, now)
-        self.logging_freq = logging_freq
-        self.detailed_logging_freq = detailed_logging_freq
+class Agent(abc.ABC):
+    def __init__(self, config: dict):
+        self.config = config
+        self.now = datetime.now().strftime("%Yy%mm%dd_%Hh%Mm%Ss")
+        self.save_dir = os.path.join(self.config["save_dir"], self.now)
 
-        # 로깅 설정
-        self.logger = self._setup_logger(save_dir, "log.txt")
+    def create_dir(self):
 
-        # 모델 저장 관련 속성
-        self.model = None
-        self.save_dir = save_dir
-        self.model_name = "model"
-        self.max_best_models = 5
-        self.best_mean_reward = -float("inf")
-        self.episode_rewards = []
-        self.total_steps = 0
-        self.start_time = None
+        # set logger
+        self.logger = self._setup_logger(self.save_dir, "log.txt")
+
+        # save config
+        os.makedirs(self.save_dir, exist_ok=True)
+        config_path = os.path.join(self.save_dir, "config.json")
+        self.save_json(config_path, self.config)
 
     def _setup_logger(self, save_dir: str, log_filename: str):
         """파일 핸들러와 콘솔 핸들러를 가진 로거 설정"""
@@ -95,3 +83,12 @@ class Algorithm(abc.ABC):
     @abc.abstractmethod
     def predict(self):
         pass
+
+    def load_json(self, path: str) -> dict:
+        with open(path, "r") as f:
+            data = json.load(f)
+        return data
+
+    def save_json(self, path: str, data: dict):
+        with open(path, "w") as f:
+            json.dump(data, f, indent=4)
