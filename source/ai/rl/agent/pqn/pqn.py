@@ -15,7 +15,7 @@ import gymnasium as gym
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
 from stable_baselines3.common.atari_wrappers import NoopResetEnv, FireResetEnv
 
-from .agent import Agent
+from source.ai.rl.agent import Agent
 
 
 @dataclass
