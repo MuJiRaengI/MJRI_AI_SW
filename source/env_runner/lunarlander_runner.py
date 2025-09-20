@@ -31,20 +31,23 @@ class LunarLanderRunner(EnvRunner):
         else:
             raise ValueError(f"지원하지 않는 알고리즘 타입입니다: {agent_type}")
 
-    def get_best_model_path(self, config: dict):
+    def get_best_model_path(self, config: dict, result_path: str = None):
         agent_type = config.get("type", None)
         if agent_type == "GA":
             best_model_name = "best_genome.pkl"
             ckpt_dir_name = "best_genomes"
 
             winner_path = None
-            # find winner path
-            result_dirs = sorted(os.listdir(config["save_dir"]))
-            if len(result_dirs) == 0:
-                print(f"No result directories found in {config['save_dir']}.")
-                return None
+            if result_path is None:
+                # find winner path
+                result_dirs = sorted(os.listdir(config["save_dir"]))
+                if len(result_dirs) == 0:
+                    print(f"No result directories found in {config['save_dir']}.")
+                    return None
 
-            latest_result_dir = os.path.join(config["save_dir"], result_dirs[-1])
+                latest_result_dir = os.path.join(config["save_dir"], result_dirs[-1])
+            else:
+                latest_result_dir = result_path
 
             best_genome_path = os.path.join(latest_result_dir, best_model_name)
             if os.path.exists(best_genome_path):
@@ -67,7 +70,7 @@ class LunarLanderRunner(EnvRunner):
         else:
             raise ValueError(f"지원하지 않는 알고리즘 타입입니다: {agent_type}")
 
-    def set_test_mode(self, config: dict, agent: Agent):
+    def set_test_mode(self, config: dict, agent: Agent, result_path: str = None):
         agent_type = config.get("type", None)
         if agent_type == "GA":
             from source.core.genetic_algorithm import GALunarLander
@@ -76,7 +79,7 @@ class LunarLanderRunner(EnvRunner):
                 print("Agent is not an instance of GALunarLander.")
                 return None
 
-            winner_path = self.get_best_model_path(config)
+            winner_path = self.get_best_model_path(config, result_path)
 
             ga_config_path = config["ga_config_path"]
             neat_config = neat.Config(
@@ -127,10 +130,12 @@ class LunarLanderRunner(EnvRunner):
                 self.render_queue.put(("done", None))
             return
 
+        result_path = os.path.join(config["save_dir"], result_dir)
+
         agent_type = config.get("type", None)
         agent = self.load_agent(agent_type)
-        best_model_path = self.get_best_model_path(config)
-        agent = self.set_test_mode(config, agent)
+        best_model_path = self.get_best_model_path(config, result_path)
+        agent = self.set_test_mode(config, agent, result_path)
         env = agent.make_env(render_mode="human")
         max_step = config["max_step"]
 
@@ -141,16 +146,15 @@ class LunarLanderRunner(EnvRunner):
                 msg = self.render_queue.get()
                 if isinstance(msg, tuple) and msg[0] == "stop":
                     break
-
-            new_best_model_path = self.get_best_model_path(config)
-            if new_best_model_path != best_model_path:
-                try:
-                    agent = self.set_test_mode(config, agent)
+            try:
+                new_best_model_path = self.get_best_model_path(config, result_path)
+                if new_best_model_path != best_model_path:
+                    agent = self.set_test_mode(config, agent, result_path)
                     best_model_path = new_best_model_path
                     print(f"🔄 Loaded new best model from {best_model_path}")
-                except Exception as e:
-                    time.sleep(1)
-                    print(f"Waiting for the model to be ready... {e}")
+            except Exception as e:
+                time.sleep(1)
+                print(f"Waiting for the model to be ready... {e}")
 
             if agent is None:
                 time.sleep(1)

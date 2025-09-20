@@ -4,36 +4,32 @@ import multiprocessing
 from multiprocessing import Queue
 
 sys.path.append(os.path.abspath("."))
-import shutil
-from datetime import datetime
-from pathlib import Path
-import ctypes
+import json
+import re
 import win32gui
 import win32process
 import psutil
-import win32con
 import importlib
-import inspect
 import os
 from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QDialog
 from PySide6.QtWidgets import QTabWidget
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtWidgets import QGraphicsScene
+from PySide6.QtWidgets import QGraphicsScene, QFileDialog
 from qt_material import apply_stylesheet
-from PySide6.QtCore import QThread, Signal
 
 from ui.designer.ui_base_tab import Ui_wdgt_base_tab
 from ui.screen_window import Screen
 from source.solution.solution import Solution
-from source.utils.thread import EnvWorker
 
 
 # 프로세스 실행 함수
-def run_render(env_class, solution_dir, mode, queue=None, screen_pos=None):
-    env = env_class()
-    env.play(solution_dir, mode, queue, screen_pos=screen_pos)
+def run_runner(
+    runner_module, config_path, mode, queue=None, screen_pos=None, result_dir=None
+):
+    runner = runner_module()
+    runner.play(config_path, mode, queue, screen_pos=screen_pos, result_dir=result_dir)
 
 
 class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
@@ -41,6 +37,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         super().__init__(parent)
         self.setupUi(self)
         self.solution = solution
+        self._currnet_config_save_dir = None
         self._screen = Screen()
         self._screen.geometryChanged = self.sync_spinbox_with_screen
         self._train_process = None
@@ -66,11 +63,8 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             if idx != -1:
                 self.cbox_target_window.setCurrentIndex(idx)
 
-        self.update_select_game_list()
-        if self.solution.game:
-            idx = self.cbox_select_game.findText(self.solution.game)
-            if idx != -1:
-                self.cbox_select_game.setCurrentIndex(idx)
+        self.ledit_config.setText(self.solution.game_config or "")
+        self.update_exp_list()
 
         self.btn_close.clicked.connect(self.slot_btn_close)
         self.btn_show_screen.clicked.connect(self.slot_btn_show_screen)
@@ -81,6 +75,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self.btn_save.clicked.connect(self.slot_btn_save)
         self._window_list_timer = QTimer(self)
         self._window_list_timer.timeout.connect(self.update_target_window_list)
+        self._window_list_timer.timeout.connect(self.update_exp_list)
         self._window_list_timer.start(100)
         self._connect_spinbox_clamp()
         self.btn_self_play.clicked.connect(lambda: self.slot_btn_env_play("self_play"))
@@ -89,35 +84,21 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         )
         self.btn_train.clicked.connect(lambda: self.slot_btn_env_play("train"))
         self.btn_test.clicked.connect(lambda: self.slot_btn_env_play("test"))
+        self.btn_config_browse.clicked.connect(self.on_config_browse_clicked)
         self.cbox_target_window.wheelEvent = lambda event: None
-        self.cbox_select_game.wheelEvent = lambda event: None
 
         self.update()
 
-    def update_select_game_list(self):
-        """
-        source/envs/__init__.py에서 from ... import ... 또는 __all__에 명시된 클래스만 cbox_select_game에 추가합니다.
-        """
+    def on_config_browse_clicked(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Configuration 파일 선택",  # 다이얼로그 제목
+            "",  # 초기 경로 (빈 문자열이면 현재 디렉토리)
+            "JSON Files (*.json);;All Files (*)",
+        )
 
-        # source.envs를 import하여, __all__ 또는 globals()에서 클래스만 추출
-        try:
-            envs_module = importlib.import_module("source.envs")
-        except Exception:
-            self.cbox_select_game.clear()
-            return
-        class_names = []
-        # __all__이 있으면 그 안의 이름만, 없으면 globals()에서 직접 추출
-        names = getattr(envs_module, "__all__", None)
-        if names is None:
-            names = [
-                name for name, obj in vars(envs_module).items() if inspect.isclass(obj)
-            ]
-        for name in names:
-            obj = getattr(envs_module, name, None)
-            if inspect.isclass(obj):
-                class_names.append(name)
-        self.cbox_select_game.clear()
-        self.cbox_select_game.addItems(class_names)
+        if file_path:
+            self.ledit_config.setText(file_path)
 
     def update_target_window_list(self):
         current_text = self.cbox_target_window.currentText()
@@ -166,15 +147,90 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
             self.cbox_target_window.blockSignals(False)
             self._last_window_list = items
 
-    def _get_env(self, env_text):
+    def update_exp_list(self):
+        current = self.cbox_exp_list.currentText()
+        config_path = self.ledit_config.text()
+
+        # json config load
+        if self._currnet_config_save_dir is None:
+            try:
+                if os.path.exists(config_path):
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                    self._currnet_config_save_dir = config.get("save_dir", None)
+            except Exception as e:
+                print(f"Error loading config: {e}")
+
+        # 새로운 experiment 리스트 가져오기
+        new_exps = []
+        if self._currnet_config_save_dir is not None:
+            if os.path.exists(self._currnet_config_save_dir):
+                new_exps = [
+                    name
+                    for name in os.listdir(self._currnet_config_save_dir)
+                    if os.path.isdir(os.path.join(self._currnet_config_save_dir, name))
+                ]
+                new_exps = sorted(new_exps)
+
+        # 현재 콤보박스의 아이템 리스트 가져오기
+        current_items = [
+            self.cbox_exp_list.itemText(i) for i in range(self.cbox_exp_list.count())
+        ]
+
+        # 리스트가 변경되었는지 확인
+        if current_items != new_exps:
+            # 변경사항이 있을 때만 업데이트
+            self.cbox_exp_list.blockSignals(True)
+            self.cbox_exp_list.clear()
+            self.cbox_exp_list.addItems(new_exps)
+
+            # 이전 선택 항목 복원
+            idx = self.cbox_exp_list.findText(current)
+            if idx != -1:
+                self.cbox_exp_list.setCurrentIndex(idx)
+
+            self.cbox_exp_list.blockSignals(False)
+
+    def _get_env_runner(self, config_path: str):
         """
         주어진 env_text에 해당하는 환경 클래스를 가져옵니다.
         """
+
+        def convert_env_name_to_runner(env_name):
+            # lunarlander-v3, lunarlander-v4 등을 lunarlanderrunner로 변환
+            pattern = r"^([a-zA-Z]+)-v\d+$"
+            match = re.match(pattern, env_name)
+            if match:
+                base_name = match.group(1)
+                return f"{base_name}Runner"
+            else:
+                # 버전이 없는 경우나 다른 패턴인 경우
+                return f"{env_name}Runner"
+
+        if not os.path.isfile(config_path):
+            QMessageBox.critical(
+                self, "오류", f"Config 파일이 존재하지 않습니다: {config_path}"
+            )
+            return None
+
+        # load json config
         try:
-            module = importlib.import_module(f"source.envs.{env_text.lower()}")
-            env_class = getattr(module, env_text, None)
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except json.JSONDecodeError as e:
+            QMessageBox.critical(
+                self, "오류", f"Config 파일을 읽는 중 오류가 발생했습니다: {e}"
+            )
+            return None
+        env_id = config.get("env_id", None)
+
+        runner_name = convert_env_name_to_runner(env_id)
+
+        try:
+            env_runner_module = importlib.import_module("source.env_runner")
+            env_class = getattr(env_runner_module, runner_name, None)
             if env_class is None:
-                raise ImportError(f"{env_text} 클래스가 {module.__name__}에 없습니다.")
+                raise ImportError(f"{runner_name} 클래스가 존재하지 않습니다.")
             return env_class
         except ImportError as e:
             QMessageBox.critical(
@@ -196,10 +252,12 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                     self.stop_train_process()
                     self.btn_train.setText("Train")
                 return
-            env_class = self._get_env(self.cbox_select_game.currentText())
-            if env_class is None:
+
+            config_path = self.ledit_config.text()
+            runner_module = self._get_env_runner(config_path)
+            if runner_module is None:
                 return
-            solution_dir = str(self.solution.root / self.solution.name)
+
             self._training_queue = Queue()
             self.pbar_state.setMinimum(0)
             self.pbar_state.setMaximum(0)
@@ -212,8 +270,14 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 self.spbx_screen_h.value(),
             )
             self._train_process = multiprocessing.Process(
-                target=run_render,
-                args=(env_class, solution_dir, mode, self._training_queue, screen_pos),
+                target=run_runner,
+                args=(
+                    runner_module,
+                    config_path,
+                    mode,
+                    self._training_queue,
+                    screen_pos,
+                ),
             )
             self._train_process.start()
             self.btn_train.setText("Stop")
@@ -244,17 +308,17 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 )
                 return
 
-            env_class = self._get_env(self.cbox_select_game.currentText())
-            if env_class is None:
+            config_path = self.ledit_config.text()
+            runner_module = self._get_env_runner(config_path)
+            if runner_module is None:
                 return
-            solution_dir = str(self.solution.root / self.solution.name)
 
             # 조작법 설명
-            if mode == "self_play":
-                key_info = env_class().key_info()
+            if mode == "self_play" and hasattr(runner_module, "key_info"):
+                key_info = runner_module().key_info()
                 if key_info:
                     QMessageBox.information(
-                        self, "조작법", f"{env_class.__name__} 조작법:\n{key_info}"
+                        self, "조작법", f"{runner_module.__name__} 조작법:\n{key_info}"
                     )
 
             self._render_queue = Queue()
@@ -265,9 +329,17 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
                 self.spbx_screen_w.value(),
                 self.spbx_screen_h.value(),
             )
+            result_dir = self.cbox_exp_list.currentText()
             self._render_process = multiprocessing.Process(
-                target=run_render,
-                args=(env_class, solution_dir, mode, self._render_queue, screen_pos),
+                target=run_runner,
+                args=(
+                    runner_module,
+                    config_path,
+                    mode,
+                    self._render_queue,
+                    screen_pos,
+                    result_dir,
+                ),
             )
             self._render_process.start()
             btn.setText("Stop")
@@ -395,6 +467,7 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         self.lbl_solution_root.setText(str(self.solution.root))
         self.lbl_solution_name.setText(str(self.solution.name))
         self.update_target_window_list()
+        self.update_exp_list()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
@@ -416,7 +489,8 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         else:
             self.solution.target_window = target_text
 
-        self.solution.game = self.cbox_select_game.currentText()
+        config_path = self.ledit_config.text()
+        self.solution.game_config = None if config_path == "" else config_path
 
     def slot_btn_save(self):
         self.update_solution_from_ui()  # UI 값으로 solution 업데이트

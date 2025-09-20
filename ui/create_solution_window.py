@@ -2,7 +2,6 @@ import os
 import sys
 import shutil
 from datetime import datetime
-from pathlib import Path
 
 sys.path.append(os.path.abspath("."))
 
@@ -59,10 +58,9 @@ class CreateSolutionWindow(QDialog, Ui_CreateSolutionWindow):
         )
 
         # Solution 객체 정보 저장
-        self.solution.root = Path(solution_root)
-        self.solution.name = Path(solution_name)
-        self.solution.json_name = Path(json_name)
-        self.solution.task = self.cbox_task.itemText(self.cbox_task.currentIndex())
+        self.solution.root = solution_root
+        self.solution.name = solution_name
+        self.solution.json_name = json_name
         self.solution.save_json()
         self.accept()
 

@@ -10,7 +10,6 @@ from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtWidgets import QDialog
 from qt_material import apply_stylesheet
-from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -149,19 +148,15 @@ class MainWindow(QMainWindow, Ui_main_window):
             self.contributors.raise_()
             self.contributors.activateWindow()
 
-    def find_tab_by_solution_path(self, solution):
+    def find_tab_by_solution_path(self, solution: Solution):
         """solution의 전체 경로와 일치하는 탭이 있으면 인덱스를 반환, 없으면 -1 반환"""
-        solution_path = str(
-            (solution.root / solution.name / solution.json_name).resolve()
-        )
+        solution_path = os.path.join(solution.root, solution.name, solution.json_name)
         for i in range(self.tblw_main.count()):
             tab_widget = self.tblw_main.widget(i)
             if hasattr(tab_widget, "solution"):
                 tab_solution = tab_widget.solution
-                tab_path = str(
-                    (
-                        tab_solution.root / tab_solution.name / tab_solution.json_name
-                    ).resolve()
+                tab_path = os.path.join(
+                    tab_solution.root, tab_solution.name, tab_solution.json_name
                 )
                 if tab_path == solution_path:
                     return i

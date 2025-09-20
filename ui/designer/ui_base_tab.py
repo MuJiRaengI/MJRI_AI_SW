@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'base_tabGbsjlv.ui'
+## Form generated from reading UI file 'base_tabTAqCoQ.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -17,8 +17,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGraphicsView,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-    QProgressBar, QPushButton, QSizePolicy, QSpacerItem,
-    QSpinBox, QVBoxLayout, QWidget)
+    QLineEdit, QProgressBar, QPushButton, QSizePolicy,
+    QSpacerItem, QSpinBox, QVBoxLayout, QWidget)
 
 class Ui_wdgt_base_tab(object):
     def setupUi(self, wdgt_base_tab):
@@ -251,17 +251,6 @@ class Ui_wdgt_base_tab(object):
         self.gridLayout_8.setObjectName(u"gridLayout_8")
         self.gridLayout_7 = QGridLayout()
         self.gridLayout_7.setObjectName(u"gridLayout_7")
-        self.cbox_select_game = QComboBox(self.groupBox_3)
-        self.cbox_select_game.setObjectName(u"cbox_select_game")
-        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        sizePolicy3.setHorizontalStretch(0)
-        sizePolicy3.setVerticalStretch(0)
-        sizePolicy3.setHeightForWidth(self.cbox_select_game.sizePolicy().hasHeightForWidth())
-        self.cbox_select_game.setSizePolicy(sizePolicy3)
-        self.cbox_select_game.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-
-        self.gridLayout_7.addWidget(self.cbox_select_game, 1, 0, 1, 1)
-
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.btn_self_play = QPushButton(self.groupBox_3)
@@ -289,12 +278,33 @@ class Ui_wdgt_base_tab(object):
         self.horizontalLayout.addWidget(self.btn_test)
 
 
-        self.gridLayout_7.addLayout(self.horizontalLayout, 2, 0, 1, 1)
+        self.gridLayout_7.addLayout(self.horizontalLayout, 3, 0, 1, 1)
 
         self.label_8 = QLabel(self.groupBox_3)
         self.label_8.setObjectName(u"label_8")
 
         self.gridLayout_7.addWidget(self.label_8, 0, 0, 1, 1)
+
+        self.horizontalLayout_3 = QHBoxLayout()
+        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.ledit_config = QLineEdit(self.groupBox_3)
+        self.ledit_config.setObjectName(u"ledit_config")
+        self.ledit_config.setReadOnly(True)
+
+        self.horizontalLayout_3.addWidget(self.ledit_config)
+
+        self.btn_config_browse = QPushButton(self.groupBox_3)
+        self.btn_config_browse.setObjectName(u"btn_config_browse")
+
+        self.horizontalLayout_3.addWidget(self.btn_config_browse)
+
+
+        self.gridLayout_7.addLayout(self.horizontalLayout_3, 1, 0, 1, 1)
+
+        self.cbox_exp_list = QComboBox(self.groupBox_3)
+        self.cbox_exp_list.setObjectName(u"cbox_exp_list")
+
+        self.gridLayout_7.addWidget(self.cbox_exp_list, 2, 0, 1, 1)
 
 
         self.gridLayout_8.addLayout(self.gridLayout_7, 0, 0, 1, 1)
@@ -343,6 +353,7 @@ class Ui_wdgt_base_tab(object):
         self.btn_random_play.setText(QCoreApplication.translate("wdgt_base_tab", u"Random Play", None))
         self.btn_train.setText(QCoreApplication.translate("wdgt_base_tab", u"Train", None))
         self.btn_test.setText(QCoreApplication.translate("wdgt_base_tab", u"Test", None))
-        self.label_8.setText(QCoreApplication.translate("wdgt_base_tab", u"Game List", None))
+        self.label_8.setText(QCoreApplication.translate("wdgt_base_tab", u"Game Config", None))
+        self.btn_config_browse.setText(QCoreApplication.translate("wdgt_base_tab", u"Browse", None))
     # retranslateUi
 
