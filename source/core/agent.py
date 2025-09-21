@@ -12,7 +12,6 @@ class Agent(abc.ABC):
         self.save_dir = os.path.join(self.config["save_dir"], self.now)
 
     def create_dir(self):
-
         # set logger
         self.logger = self._setup_logger(self.save_dir, "log.txt")
 
