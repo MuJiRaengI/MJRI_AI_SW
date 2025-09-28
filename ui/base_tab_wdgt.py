@@ -197,22 +197,28 @@ class WdgtBaseTab(QDialog, Ui_wdgt_base_tab):
         """
 
         def convert_env_name_to_runner(env_name):
-            # ALE/Breakout-v5 패턴을 BreakoutRunner로 변환
-            ale_pattern = r"^ALE/([a-zA-Z]+)-v\d+$"
-            match = re.match(ale_pattern, env_name)
-            if match:
-                base_name = match.group(1)
-                return f"{base_name}Runner"
+            try:
+                # ALE/Breakout-v5 패턴을 BreakoutRunner로 변환
+                ale_pattern = r"^ALE/([a-zA-Z]+)-v\d+$"
+                match = re.match(ale_pattern, env_name)
+                if match:
+                    base_name = match.group(1)
+                    return f"{base_name}Runner"
+            except Exception:
+                pass
 
-            # lunarlander-v3, lunarlander-v4 등을 lunarlanderrunner로 변환
-            pattern = r"^([a-zA-Z]+)-v\d+$"
-            match = re.match(pattern, env_name)
-            if match:
-                base_name = match.group(1)
-                return f"{base_name}Runner"
-            else:
-                # 버전이 없는 경우나 다른 패턴인 경우
-                return f"{env_name}Runner"
+            try:
+                # lunarlander-v3, lunarlander-v4 등을 lunarlanderrunner로 변환
+                pattern = r"^([a-zA-Z]+)-v\d+$"
+                match = re.match(pattern, env_name)
+                if match:
+                    base_name = match.group(1)
+                    return f"{base_name}Runner"
+                else:
+                    # 버전이 없는 경우나 다른 패턴인 경우
+                    return f"{env_name}Runner"
+            except Exception:
+                pass
 
         if not os.path.isfile(config_path):
             QMessageBox.critical(

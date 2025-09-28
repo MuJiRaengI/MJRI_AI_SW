@@ -24,12 +24,12 @@ def sort_checkpoint_files_by_fitness(directory_path, descending=True):
     return sorted_files
 
 
-def sort_checkpoint_files_by_reward(directory_path, descending=True):
+def sort_checkpoint_files_by_reward(directory_path, descending=True, ext=".pth"):
     """reward 기준으로 checkpoint 파일들을 정렬"""
 
     # .pth 파일들 중 checkpoint 파일만 필터링
     pth_files = [
-        f for f in os.listdir(directory_path) if f.endswith(".pth") and "reward_" in f
+        f for f in os.listdir(directory_path) if f.endswith(ext) and "reward_" in f
     ]
 
     def extract_reward(filename):

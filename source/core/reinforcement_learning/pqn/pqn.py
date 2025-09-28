@@ -20,6 +20,8 @@ from source.core.reinforcement_learning.pqn.transition import Transition
 class PQN(ReinforcementLearning):
     def __init__(self, config: dict):
         super().__init__(config)
+        self.log_reward_threshold = 5.0
+        self.log_reward_step = 200
 
     def make_env(
         self,
@@ -129,7 +131,8 @@ class PQN(ReinforcementLearning):
             if len(obs.shape) == 3:
                 obs = obs[np.newaxis, ...]  # Add batch dimension
             obs = torch.from_numpy(obs).float()  # (B, H, W, C)
-        return obs / 255.0  # Normalize to [0, 1]
+        # return obs / 255.0  # Normalize to [0, 1]
+        return obs
 
     def load_model(self, model_type: str):
         if model_type.lower() == "pqn_cnn":
@@ -222,10 +225,6 @@ class PQN(ReinforcementLearning):
         if isinstance(current_obs, tuple):
             current_obs, info = current_obs
 
-        # Ensure proper shape for vectorized envs
-        if len(current_obs.shape) == 3:  # Single env
-            current_obs = current_obs[np.newaxis, ...]  # Add batch dimension
-
         # Training loop
         all_metrics = []
 
@@ -233,6 +232,45 @@ class PQN(ReinforcementLearning):
             train_state, obs, metrics = self._update_step(current_obs, train_state)
             all_metrics.append(metrics)
             current_obs = obs
+
+            # 상세 로깅 (매 log_interval마다)
+            if (update + 1) % self.log_interval == 0:
+                current_eps = self.eps_scheduler(
+                    step=train_state.n_updates,
+                    eps_start=self.eps_start,
+                    eps_finish=self.eps_finish,
+                    eps_decay=self.eps_decay,
+                    num_updates_decay=self.num_updates_decay,
+                )
+
+                # 최근 metrics들의 평균 계산
+                recent_metrics = all_metrics[-self.log_interval :]
+                avg_td_loss = np.mean([m["td_loss"] for m in recent_metrics])
+                avg_qvals = np.mean([m["qvals"] for m in recent_metrics])
+
+                # 최근 에피소드 보상 정보
+                recent_episode_returns = [
+                    m.get("episode_return", None)
+                    for m in recent_metrics
+                    if "episode_return" in m
+                ]
+
+                log_msg = f"Update {update + 1}/{self.num_updates} | "
+                log_msg += f"Steps: {train_state.timesteps} | "
+                log_msg += f"Epsilon: {current_eps:.4f} | "
+                log_msg += f"TD Loss: {avg_td_loss:.4f} | "
+                log_msg += f"Q Values: {avg_qvals:.2f}"
+
+                if recent_episode_returns:
+                    avg_episode_return = np.mean(recent_episode_returns)
+                    log_msg += f" | Episode Return: {avg_episode_return:.2f}"
+
+                if len(self.episode_rewards) > 0:
+                    current_mean_reward = self.get_mean_reward()
+                    log_msg += f" | Mean Reward: {current_mean_reward:.2f}"
+                    log_msg += f" | Best Reward: {self.best_mean_reward:.2f}"
+
+                self.logger.info(log_msg)
 
             # 설정된 간격으로 best 모델 저장 체크
             if (update + 1) % self.save_best_interval == 0:
@@ -259,7 +297,8 @@ class PQN(ReinforcementLearning):
         obs = current_obs.copy()
         for step in range(self.num_steps):
             # Convert numpy to torch tensor and move to device
-            obs_tensor = torch.from_numpy(obs).float().to(self.device)
+            # obs_tensor = torch.from_numpy(obs).float().to(self.device)
+            obs_tensor = self.preprocess(obs).to(self.device)
 
             # Set network to eval mode for action selection
             self.model.eval()
@@ -314,6 +353,32 @@ class PQN(ReinforcementLearning):
                         # Agent 클래스에 에피소드 보상 기록
                         self.update_episode_rewards(episode_rewards[env_idx])
 
+                        # 에피소드 완료 로깅
+                        current_eps = self.eps_scheduler(
+                            step=train_state.n_updates,
+                            eps_start=self.eps_start,
+                            eps_finish=self.eps_finish,
+                            eps_decay=self.eps_decay,
+                            num_updates_decay=self.num_updates_decay,
+                        )
+
+                        episode_log = f"Episode Complete | Env {env_idx} | "
+                        episode_log += f"Reward: {episode_rewards[env_idx]:.2f} | "
+                        episode_log += f"Length: {episode_steps[env_idx]} steps | "
+                        episode_log += f"Total Episodes: {len(self.episode_rewards)} | "
+
+                        if len(self.episode_rewards) >= 10:
+                            current_mean = self.get_mean_reward()
+                            episode_log += f"Mean Reward: {current_mean:.2f} | "
+                            episode_log += f"Epsilon: {current_eps:.4f}"
+
+                        # 높은 보상이나 긴 에피소드일 때만 로깅 (너무 많은 로그 방지)
+                        if (
+                            episode_rewards[env_idx] > self.log_reward_threshold
+                            or episode_steps[env_idx] > self.log_reward_step
+                        ):
+                            self.logger.info(episode_log)
+
                         # 충분한 에피소드가 누적되면 best 모델 저장 체크
                         if len(self.episode_rewards) >= 10:  # 최소 10개 에피소드 필요
                             saved = self.check_and_save_best(
@@ -322,7 +387,7 @@ class PQN(ReinforcementLearning):
                             if saved:
                                 mean_reward = self.get_mean_reward()
                                 self.logger.info(
-                                    f"Episode completed: New best model saved! Mean reward: {mean_reward:.3f}"
+                                    f"🎯 NEW BEST MODEL SAVED! Mean reward: {mean_reward:.3f} (Previous: {self.best_mean_reward:.3f})"
                                 )
 
                     episode_rewards[env_idx] = 0
@@ -539,6 +604,30 @@ class PQN(ReinforcementLearning):
             self.model.load_state_dict(
                 torch.load(self.pretrained_path, map_location=self.device)
             )
+
+        # 학습 시작 전 설정 정보 로깅
+        self.logger.info("=" * 60)
+        self.logger.info("PQN 학습 시작 - 설정 정보")
+        self.logger.info("=" * 60)
+        self.logger.info(f"환경: {self.env_id}")
+        self.logger.info(
+            f"총 스텝: {self.total_timesteps:,} | 총 업데이트: {self.num_updates:,}"
+        )
+        self.logger.info(
+            f"환경 개수: {self.total_envs} (train: {self.env_num}, test: {self.test_env_num})"
+        )
+        self.logger.info(
+            f"Epsilon: {self.eps_start:.4f} → {self.eps_finish:.4f} (decay: {self.eps_decay:.3f})"
+        )
+        self.logger.info(
+            f"학습률: {self.lr:.6f} (linear decay: {self.lr_linear_decay})"
+        )
+        self.logger.info(f"할인율(γ): {self.gamma} | Lambda: {self.lam}")
+        self.logger.info(f"Best 모델 저장 간격: {self.save_best_interval} 업데이트")
+        self.logger.info(f"디바이스: {self.device}")
+        if self.pretrained_path:
+            self.logger.info(f"사전 훈련 모델: 사용")
+        self.logger.info("=" * 60)
 
         self.start_time = time.time()
 

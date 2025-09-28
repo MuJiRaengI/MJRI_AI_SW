@@ -22,6 +22,7 @@ class ReinforcementLearning(Agent):
         self.start_time = None
         self.save_best_interval = 100
         self.detailed_logging_freq = 100
+        self.log_interval = 100
 
     def make_env(self):
         raise NotImplementedError("make_env method must be implemented in subclass")

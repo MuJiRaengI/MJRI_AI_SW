@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import glob
 from datetime import datetime
 from multiprocessing import Process, Queue
 
@@ -47,7 +48,7 @@ class MainWindow(QMainWindow, Ui_main_window):
 
     def slot_update_vector_db(self):
         try:
-            all_files = list(Path(self.vectordb_file_path).glob("*.txt"))
+            all_files = glob.glob(os.path.join(self.vectordb_file_path, "*.txt"))
 
             documents = []
             for file in all_files:

@@ -15,17 +15,17 @@ from source.env_runner import EnvRunner
 from source.env_runner.utils import *
 
 
-class BreakoutRunner(EnvRunner):
+class Env2048Runner(EnvRunner):
     def __init__(self):
         super().__init__()
-        self.env_id = "ALE/Breakout-v5"
+        self.env_id = "Env2048"
         self.scale = 1
 
     def load_agent(self, agent_type: str):
         if agent_type.lower() == "PQN".lower():
-            from source.core.reinforcement_learning.pqn import PQN
+            from source.core.reinforcement_learning.pqn import PQNEnv2048
 
-            return PQN(self.load_json(self.config_path))
+            return PQNEnv2048(self.load_json(self.config_path))
 
         else:
             raise ValueError(f"지원하지 않는 알고리즘 타입입니다: {agent_type}")
@@ -292,13 +292,13 @@ class BreakoutRunner(EnvRunner):
 
 
 if __name__ == "__main__":
-    runner = BreakoutRunner()
+    runner = Env2048Runner()
     config_path = (
-        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\configs\breakout\config_pqn_cnn.json"
+        r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\configs\env2048\config_pqn_mlp.json"
     )
     runner.play(
         config_path=config_path,
-        mode="test",
+        mode="train",
         queue=None,
-        result_dir=r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\sol_breakout_pqn_cnn\results\2025y09m21d_21h25m05s",
+        result_dir=r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\sol_env2048_pqn_mlp\results\2025y09m21d_19h03m12s",
     )
