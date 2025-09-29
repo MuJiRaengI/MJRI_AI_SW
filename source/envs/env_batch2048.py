@@ -256,7 +256,7 @@ class Batch2048Core:
 
                 pygame.display.flip()
                 # throttle to keep CPU low and keep window responsive
-                # clock.tick(10)  # 10 FPS
+                # clock.tick(30)  # 10 FPS
         finally:
             pygame.quit()
 

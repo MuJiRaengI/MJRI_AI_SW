@@ -1,7 +1,7 @@
 import numpy as np
 from mss import mss
 from collections import deque
-from threading import Thread
+from threading import Thread, Lock
 import time
 
 
@@ -15,6 +15,7 @@ class MJRIScreen:
         self.running = False
         self.fps = fps
         self.thread = None
+        self.lock = Lock()  # Added lock for thread safety
         if self.thread_run:
             self.thread = Thread(target=self.run_auto_capture, daemon=True)
             self.thread.start()
@@ -40,6 +41,13 @@ class MJRIScreen:
         else:
             self.screenshot_buffer = None
 
+    def get_screen_buffer(self):
+        """현재 스크린 캡처 버퍼를 반환합니다."""
+        with self.lock:  # Lock to ensure thread-safe access to the buffer
+            if self.screenshot_buffer is not None:
+                return list(self.screenshot_buffer)
+        return None
+
     def capture(self):
         with mss() as sct:
             if None in (self.x, self.y, self.w, self.h) or min(self.w, self.h) <= 0:
@@ -55,15 +63,16 @@ class MJRIScreen:
         screenshot = np.array(screenshot)[..., :3]
         if self.is_fail_screenshot(screenshot):
             return None
-        if self.screenshot_buffer is not None:
-            # 마지막 frame과 현재 frame이 동일하면 저장하지 않음
-            if len(self.screenshot_buffer) == 0 or not np.array_equal(
-                self.screenshot_buffer[-1], screenshot
-            ):
-                self.screenshot_buffer.append(screenshot)
-                if self.fps > 0:
-                    # FPS 제한을 위해 대기
-                    time.sleep(1 / self.fps)
+        with self.lock:  # Lock to ensure thread-safe access to the buffer
+            if self.screenshot_buffer is not None:
+                # 마지막 frame과 현재 frame이 동일하면 저장하지 않음
+                if len(self.screenshot_buffer) == 0 or not np.array_equal(
+                    self.screenshot_buffer[-1], screenshot
+                ):
+                    self.screenshot_buffer.append(screenshot)
+                    if self.fps > 0:
+                        # FPS 제한을 위해 대기
+                        time.sleep(1 / self.fps)
         return screenshot
 
     def is_fail_screenshot(self, screenshot: np.ndarray) -> bool:

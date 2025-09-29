@@ -1,23 +1,19 @@
-import os
 import torch.nn as nn
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.vec_env import VecNormalize, VecMonitor
 
 from source.core.reinforcement_learning import ReinforcementLearning
-from source.envs import EnvBatch2048, SB3Batch2048VecEnv
+from source.envs import EnvPikachuVolleyBallReal
 from source.core.reinforcement_learning.ppo.callback import (
     MonitorAndTimedCheckpointCallback,
     EnhancedMonitorAndCheckpointCallback,
 )
 
 
-class PPOBatch2048(ReinforcementLearning):
+class PPOPikachuVolleyBallReal(ReinforcementLearning):
     def __init__(self, config: dict):
         super().__init__(config)
-
-        self.obs_mode = config["obs_mode"]
-        self.env_num = config["env_num"]
-        self.seed = config["seed"]
+        self.env_num = 1
 
         self.env = self.make_env()
         self.agent = None
@@ -48,27 +44,12 @@ class PPOBatch2048(ReinforcementLearning):
         self.ent_coef = config["ent_coef"]
         self.max_grad_norm = config["max_grad_norm"]
         self.device = config["device"]
-        self.pretrained_path = config["pretrained_path"]
 
         self.total_timesteps = config["total_timesteps"]
         self.callback = None
 
-    def make_env(self, mode="train", render_mode=None):
-        if self.obs_mode.lower() == "uint8x16":
-            obs_mode = EnvBatch2048.ObsMode.ONEHOT256
-        else:
-            raise NotImplementedError(f"지원하지 않는 obs_mode 입니다: {self.obs_mode}")
-
-        env = EnvBatch2048(
-            obs_mode=obs_mode,
-            num_envs=self.env_num,
-            seed=self.seed,
-            render_mode=render_mode,
-        )
-        if mode == "train":
-            env = SB3Batch2048VecEnv(env)
-            env = VecMonitor(env)
-            env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.0)
+    def make_env(self, *args, **kwargs):
+        env = EnvPikachuVolleyBallReal(screen_pos=self.config["screen_pos"])
         return env
 
     def load_callback(self):
@@ -100,16 +81,9 @@ class PPOBatch2048(ReinforcementLearning):
             vf_coef=self.vf_coef,
             ent_coef=self.ent_coef,
             max_grad_norm=self.max_grad_norm,
-            tensorboard_log=os.path.join(self.save_dir, "tensorboard"),
             verbose=1,
             device=self.device,
         )
-
-        # Load pretrained parameters if a path is provided
-        if self.pretrained_path and os.path.exists(self.pretrained_path):
-            self.agent.set_parameters(self.pretrained_path)
-            print(f"Loaded pretrained parameters from {self.pretrained_path}")
-
         self.callback = self.load_callback()
         self.agent.learn(
             total_timesteps=self.total_timesteps,
@@ -117,7 +91,7 @@ class PPOBatch2048(ReinforcementLearning):
         )
 
     def prepare_predict(self, best_path):
-        self.agent = MaskablePPO.load(best_path, device="cpu")
+        self.agent = MaskablePPO.load(best_path)
 
     def predict(self, obs, action_mask):
         action, _states = self.agent.predict(

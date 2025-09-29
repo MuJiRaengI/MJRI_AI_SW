@@ -14,17 +14,17 @@ from source.env_runner import EnvRunner
 from source.env_runner.utils import *
 
 
-class EnvBatch2048Runner(EnvRunner):
+class EnvPikachuVolleyBallRealRunner(EnvRunner):
     def __init__(self):
         super().__init__()
-        self.env_id = "EnvBatch2048"
+        self.env_id = "EnvPikachuVolleyBallReal"
         self.scale = 1
 
     def load_agent(self, agent_type: str):
         if agent_type.lower() == "PPO".lower():
-            from source.core.reinforcement_learning.ppo import PPOBatch2048
+            from source.core.reinforcement_learning.ppo import PPOPikachuVolleyBallReal
 
-            return PPOBatch2048(self.load_json(self.config_path))
+            return PPOPikachuVolleyBallReal(self.load_json(self.config_path))
 
         else:
             raise ValueError(f"지원하지 않는 알고리즘 타입입니다: {agent_type}")
@@ -74,6 +74,9 @@ class EnvBatch2048Runner(EnvRunner):
     def _train(self, *args, **kwargs):
         try:
             config = self.load_json(self.config_path)
+            if "screen_pos" in kwargs:
+                config["screen_pos"] = kwargs["screen_pos"]
+                self.save_json(self.config_path, config)
 
             agent_type = config["agent_type"]
             agent = self.load_agent(agent_type)
@@ -108,23 +111,23 @@ class EnvBatch2048Runner(EnvRunner):
             obs, info = env.reset()
             step = 0
             while self.running:
-                # if self.render_queue is not None and not self.render_queue.empty():
-                #     msg = self.render_queue.get()
-                #     if isinstance(msg, tuple) and msg[0] == "stop":
-                #         break
-                # try:
-                #     new_best_model_path = self.get_best_model_path(config, result_path)
-                #     if new_best_model_path != best_model_path:
-                #         agent = self.set_test_mode(config, agent, result_path)
-                #         best_model_path = new_best_model_path
-                #         print(f"🔄 Loaded new best model from {best_model_path}")
-                # except Exception as e:
-                #     time.sleep(1)
-                #     print(f"Waiting for the model to be ready... {e}")
+                if self.render_queue is not None and not self.render_queue.empty():
+                    msg = self.render_queue.get()
+                    if isinstance(msg, tuple) and msg[0] == "stop":
+                        break
+                try:
+                    new_best_model_path = self.get_best_model_path(config, result_path)
+                    if new_best_model_path != best_model_path:
+                        agent = self.set_test_mode(config, agent, result_path)
+                        best_model_path = new_best_model_path
+                        print(f"🔄 Loaded new best model from {best_model_path}")
+                except Exception as e:
+                    time.sleep(1)
+                    print(f"Waiting for the model to be ready... {e}")
 
-                # if agent is None:
-                #     time.sleep(1)
-                #     continue
+                if agent is None:
+                    time.sleep(1)
+                    continue
 
                 action = agent.predict(obs, info["legal_actions"])
                 done = False
@@ -134,8 +137,8 @@ class EnvBatch2048Runner(EnvRunner):
                 if terminated or truncated:
                     done = True
 
-                # print(env.render_obs(obs))
-                # print()
+                print(env.render_obs(obs))
+                print()
                 if done:
                     time.sleep(1)
                     obs, info = env.reset()
@@ -149,11 +152,12 @@ class EnvBatch2048Runner(EnvRunner):
 
 
 if __name__ == "__main__":
-    runner = EnvBatch2048Runner()
-    config_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\configs\envbatch2048\config_ppo_mlp.json"
+    runner = EnvPikachuVolleyBallRealRunner()
+    config_path = r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\configs\pikachu_volleyball_real\config_ppo_mlp.json"
     runner.play(
         config_path=config_path,
-        mode="test",
+        mode="train",
         queue=None,
-        result_dir=r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\sol_envbatch2048_ppo_mlp\results\test",
+        screen_pos=(35, 373, 1215, 860),
+        result_dir=r"C:\Users\stpe9\Desktop\vscode\MJRI_AI_SW\sol_pikachu_volleyball_real\results\2025y09m25d_23h55m08s",
     )
